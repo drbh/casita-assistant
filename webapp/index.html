@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casita Assistant - Zigbee Control</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Casita Assistant</h1>
+            <div id="network-status" class="status">
+                <span class="status-dot"></span>
+                <span class="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <nav>
+            <button data-view="devices" class="active">Devices</button>
+            <button data-view="network">Network</button>
+        </nav>
+
+        <main>
+            <!-- Devices View -->
+            <section id="devices-view" class="view active">
+                <div class="toolbar">
+                    <button id="permit-join-btn" class="btn btn-primary">
+                        Permit Join (60s)
+                    </button>
+                    <button id="refresh-btn" class="btn">Refresh</button>
+                </div>
+                <div id="device-list" class="device-grid">
+                    <p class="empty-state">No devices found. Click "Permit Join" to pair new devices.</p>
+                </div>
+            </section>
+
+            <!-- Network View -->
+            <section id="network-view" class="view">
+                <div class="info-card">
+                    <h2>Network Information</h2>
+                    <dl id="network-info">
+                        <dt>Status</dt>
+                        <dd id="net-status">--</dd>
+                        <dt>Channel</dt>
+                        <dd id="net-channel">--</dd>
+                        <dt>PAN ID</dt>
+                        <dd id="net-panid">--</dd>
+                        <dt>Extended PAN ID</dt>
+                        <dd id="net-extpanid">--</dd>
+                        <dt>Permit Join</dt>
+                        <dd id="net-permitjoin">--</dd>
+                        <dt>Device Count</dt>
+                        <dd id="net-devices">--</dd>
+                    </dl>
+                </div>
+                <div class="info-card">
+                    <h2>System Information</h2>
+                    <dl id="system-info">
+                        <dt>Application</dt>
+                        <dd id="sys-name">--</dd>
+                        <dt>Version</dt>
+                        <dd id="sys-version">--</dd>
+                        <dt>Firmware</dt>
+                        <dd id="sys-firmware">--</dd>
+                    </dl>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div id="ws-status" class="ws-indicator disconnected">
+                <span class="ws-dot"></span>
+                <span>WebSocket</span>
+            </div>
+        </footer>
+    </div>
+
+    <script type="module" src="/js/app.js"></script>
+</body>
+</html>

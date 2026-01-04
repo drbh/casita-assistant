@@ -1,0 +1,13 @@
+[package]
+name = "zigbee-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+deconz-protocol = { workspace = true }
+tokio = { workspace = true }
+dashmap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }

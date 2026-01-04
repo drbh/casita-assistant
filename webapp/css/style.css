@@ -1,0 +1,309 @@
+/* Casita Assistant - Zigbee Control Styles */
+
+:root {
+    --bg-color: #1a1a2e;
+    --surface-color: #16213e;
+    --surface-light: #1f3460;
+    --primary-color: #e94560;
+    --secondary-color: #0f3460;
+    --text-color: #eaeaea;
+    --text-muted: #8a8a9a;
+    --success-color: #4ade80;
+    --warning-color: #fbbf24;
+    --error-color: #f87171;
+    --border-radius: 8px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    min-height: 100vh;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Header */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background-color: var(--surface-color);
+    border-bottom: 1px solid var(--surface-light);
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, var(--primary-color), #ff8a80);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Status indicator */
+.status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--surface-light);
+    border-radius: 20px;
+    font-size: 0.875rem;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--warning-color);
+    animation: pulse 2s infinite;
+}
+
+.status.connected .status-dot {
+    background-color: var(--success-color);
+    animation: none;
+}
+
+.status.disconnected .status-dot {
+    background-color: var(--error-color);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Navigation */
+nav {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem 2rem;
+    background-color: var(--surface-color);
+}
+
+nav button {
+    padding: 0.5rem 1.5rem;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    cursor: pointer;
+    border-radius: var(--border-radius);
+    transition: all 0.2s;
+}
+
+nav button:hover {
+    background-color: var(--surface-light);
+    color: var(--text-color);
+}
+
+nav button.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Main content */
+main {
+    flex: 1;
+    padding: 2rem;
+}
+
+.view {
+    display: none;
+}
+
+.view.active {
+    display: block;
+}
+
+/* Toolbar */
+.toolbar {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--border-radius);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-color: var(--surface-light);
+    color: var(--text-color);
+}
+
+.btn:hover {
+    filter: brightness(1.1);
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Device grid */
+.device-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.empty-state {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+/* Device card */
+.device-card {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    border: 1px solid var(--surface-light);
+    transition: all 0.2s;
+}
+
+.device-card:hover {
+    border-color: var(--primary-color);
+    transform: translateY(-2px);
+}
+
+.device-card h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.device-card .device-info {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+}
+
+.device-card .device-type {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background-color: var(--secondary-color);
+    border-radius: 4px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+}
+
+.device-card .device-controls {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.device-card .toggle-btn {
+    flex: 1;
+    padding: 0.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all 0.2s;
+}
+
+.device-card .toggle-btn.on {
+    background-color: var(--success-color);
+    color: #1a1a2e;
+}
+
+.device-card .toggle-btn.off {
+    background-color: var(--surface-light);
+    color: var(--text-muted);
+}
+
+/* Info cards */
+.info-card {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid var(--surface-light);
+}
+
+.info-card h2 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+}
+
+.info-card dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.5rem 1rem;
+}
+
+.info-card dt {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.info-card dd {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.875rem;
+}
+
+/* Footer */
+footer {
+    padding: 0.75rem 2rem;
+    background-color: var(--surface-color);
+    border-top: 1px solid var(--surface-light);
+}
+
+.ws-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.ws-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.ws-indicator.connected .ws-dot {
+    background-color: var(--success-color);
+}
+
+.ws-indicator.disconnected .ws-dot {
+    background-color: var(--error-color);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    header, nav, main, footer {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+
+    .toolbar {
+        flex-direction: column;
+    }
+}

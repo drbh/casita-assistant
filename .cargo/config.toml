@@ -1,0 +1,8 @@
+# Cross-compilation configuration for RISC-V targets
+
+[target.riscv64gc-unknown-linux-gnu]
+linker = "riscv64-linux-gnu-gcc"
+
+# Alternative: use cross-rs which handles toolchain automatically
+# cargo install cross
+# cross build --release --target riscv64gc-unknown-linux-gnu

@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/deconz-protocol",
+    "crates/zigbee-core",
+    "crates/casita-assistant-api",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["drbh"]
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+
+# Serial communication
+serial2 = "0.2"
+
+# Web framework
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["fs", "cors", "trace"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Utilities
+bytes = "1"
+dashmap = "6"
+thiserror = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Internal crates
+deconz-protocol = { path = "crates/deconz-protocol" }
+zigbee-core = { path = "crates/zigbee-core" }
