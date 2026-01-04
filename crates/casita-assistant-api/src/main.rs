@@ -13,12 +13,17 @@ use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use zigbee_core::ZigbeeNetwork;
 
+mod camera;
+mod rtsp;
 mod websocket;
+
+use camera::CameraManager;
 
 /// Application state shared across handlers
 #[derive(Clone)]
 pub struct AppState {
-    pub network: Arc<ZigbeeNetwork>,
+    pub network: Option<Arc<ZigbeeNetwork>>,
+    pub cameras: Arc<CameraManager>,
 }
 
 /// API response wrapper using serde_json::Value for flexibility
@@ -70,9 +75,12 @@ fn default_duration() -> u8 {
 
 /// Get system info
 async fn system_info(State(state): State<AppState>) -> impl IntoResponse {
-    let firmware = match state.network.transport().get_version().await {
-        Ok(v) => Some(v.to_string()),
-        Err(_) => None,
+    let firmware = match &state.network {
+        Some(network) => match network.transport().get_version().await {
+            Ok(v) => Some(v.to_string()),
+            Err(_) => None,
+        },
+        None => None,
     };
 
     Json(ApiResponse::success(SystemInfo {
@@ -84,7 +92,13 @@ async fn system_info(State(state): State<AppState>) -> impl IntoResponse {
 
 /// Get network status
 async fn network_status(State(state): State<AppState>) -> impl IntoResponse {
-    match state.network.get_status().await {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
+    match network.get_status().await {
         Ok(status) => (StatusCode::OK, Json(ApiResponse::success(status))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -98,7 +112,13 @@ async fn permit_join(
     State(state): State<AppState>,
     Json(req): Json<PermitJoinRequest>,
 ) -> impl IntoResponse {
-    match state.network.permit_join(req.duration).await {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
+    match network.permit_join(req.duration).await {
         Ok(_) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
@@ -114,12 +134,21 @@ async fn permit_join(
 
 /// List all devices
 async fn list_devices(State(state): State<AppState>) -> impl IntoResponse {
-    let devices = state.network.get_devices();
+    let devices = match &state.network {
+        Some(network) => network.get_devices(),
+        None => vec![],
+    };
     Json(ApiResponse::success(devices))
 }
 
 /// Get a specific device
 async fn get_device(State(state): State<AppState>, Path(ieee): Path<String>) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
     // Parse IEEE address from hex string
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
@@ -131,7 +160,7 @@ async fn get_device(State(state): State<AppState>, Path(ieee): Path<String>) -> 
         }
     };
 
-    match state.network.get_device(&ieee_bytes) {
+    match network.get_device(&ieee_bytes) {
         Some(device) => (StatusCode::OK, Json(ApiResponse::success(device))),
         None => (
             StatusCode::NOT_FOUND,
@@ -145,6 +174,12 @@ async fn discover_device(
     State(state): State<AppState>,
     Path(ieee): Path<String>,
 ) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -155,7 +190,7 @@ async fn discover_device(
         }
     };
 
-    match state.network.discover_endpoints(&ieee_bytes).await {
+    match network.discover_endpoints(&ieee_bytes).await {
         Ok(_) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
@@ -211,8 +246,14 @@ async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl
 
 /// Request APS data (fetch pending data from devices)
 async fn request_aps_data(State(state): State<AppState>) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
     // First check if there's data waiting
-    let device_state = match state.network.transport().get_device_state().await {
+    let device_state = match network.transport().get_device_state().await {
         Ok(state) => state,
         Err(e) => {
             return (
@@ -232,7 +273,7 @@ async fn request_aps_data(State(state): State<AppState>) -> impl IntoResponse {
         );
     }
 
-    match state.network.transport().request_aps_data().await {
+    match network.transport().request_aps_data().await {
         Ok(data) => {
             // Format the raw data as hex for visibility
             let hex_data: Vec<String> = data.iter().map(|b| format!("{b:02X}")).collect();
@@ -257,6 +298,12 @@ async fn toggle_device(
     State(state): State<AppState>,
     Path((ieee, endpoint)): Path<(String, u8)>,
 ) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -267,7 +314,7 @@ async fn toggle_device(
         }
     };
 
-    match state.network.toggle_device(&ieee_bytes, endpoint).await {
+    match network.toggle_device(&ieee_bytes, endpoint).await {
         Ok(_) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
@@ -288,6 +335,12 @@ async fn device_on(
     State(state): State<AppState>,
     Path((ieee, endpoint)): Path<(String, u8)>,
 ) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -298,7 +351,7 @@ async fn device_on(
         }
     };
 
-    match state.network.turn_on(&ieee_bytes, endpoint).await {
+    match network.turn_on(&ieee_bytes, endpoint).await {
         Ok(_) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
@@ -319,6 +372,12 @@ async fn device_off(
     State(state): State<AppState>,
     Path((ieee, endpoint)): Path<(String, u8)>,
 ) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
         Err(_) => {
@@ -329,7 +388,7 @@ async fn device_off(
         }
     };
 
-    match state.network.turn_off(&ieee_bytes, endpoint).await {
+    match network.turn_off(&ieee_bytes, endpoint).await {
         Ok(_) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
@@ -368,34 +427,67 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting Casita Assistant API server");
 
-    // Get serial port from env or use default
-    let serial_port = std::env::var("CONBEE_PORT").unwrap_or_else(|_| "/dev/ttyUSB0".to_string());
-
-    // Connect to Zigbee network
-    tracing::info!("Connecting to ConBee II at {}", serial_port);
-    let network = ZigbeeNetwork::new(&serial_port).await?;
-
-    // Query and display firmware version
-    match network.transport().get_version().await {
-        Ok(version) => tracing::info!("ConBee II firmware: {}", version),
-        Err(e) => tracing::warn!("Failed to query firmware version: {}", e),
+    // Initialize camera manager first (always available)
+    let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".to_string());
+    let cameras = CameraManager::new(std::path::Path::new(&data_dir));
+    if let Err(e) = cameras.load() {
+        tracing::warn!("Failed to load cameras: {}", e);
     }
 
-    // Query network status
-    match network.get_status().await {
-        Ok(status) => {
-            tracing::info!(
-                "Network status: connected={}, channel={}, PAN ID={:#06x}",
-                status.connected,
-                status.channel,
-                status.pan_id
-            );
+    // Try to connect to Zigbee network (optional)
+    let network = {
+        // Get serial port from env or use default
+        let serial_port = std::env::var("CONBEE_PORT").unwrap_or_else(|_| {
+            // Try udev symlink first, then common paths
+            for path in ["/dev/conbee2", "/dev/ttyACM0", "/dev/ttyUSB0"] {
+                if std::path::Path::new(path).exists() {
+                    return path.to_string();
+                }
+            }
+            String::new()
+        });
+
+        if serial_port.is_empty() {
+            tracing::warn!("No Zigbee device found - running without Zigbee support");
+            None
+        } else {
+            tracing::info!("Connecting to ConBee II at {}", serial_port);
+            match ZigbeeNetwork::new(&serial_port).await {
+                Ok(network) => {
+                    // Query and display firmware version
+                    match network.transport().get_version().await {
+                        Ok(version) => tracing::info!("ConBee II firmware: {}", version),
+                        Err(e) => tracing::warn!("Failed to query firmware version: {}", e),
+                    }
+
+                    // Query network status
+                    match network.get_status().await {
+                        Ok(status) => {
+                            tracing::info!(
+                                "Network status: connected={}, channel={}, PAN ID={:#06x}",
+                                status.connected,
+                                status.channel,
+                                status.pan_id
+                            );
+                        }
+                        Err(e) => tracing::warn!("Failed to query network status: {}", e),
+                    }
+                    Some(Arc::new(network))
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to connect to Zigbee device: {} - running without Zigbee support",
+                        e
+                    );
+                    None
+                }
+            }
         }
-        Err(e) => tracing::warn!("Failed to query network status: {}", e),
-    }
+    };
 
     let state = AppState {
-        network: Arc::new(network),
+        network,
+        cameras: Arc::new(cameras),
     };
 
     // Build the router
@@ -425,6 +517,15 @@ async fn main() -> anyhow::Result<()> {
             "/api/v1/devices/:ieee/endpoints/:endpoint/off",
             post(device_off),
         )
+        // Camera routes
+        .route("/api/v1/cameras", get(camera::list_cameras))
+        .route("/api/v1/cameras", post(camera::add_camera))
+        .route("/api/v1/cameras/:id", get(camera::get_camera))
+        .route(
+            "/api/v1/cameras/:id",
+            axum::routing::delete(camera::delete_camera),
+        )
+        .route("/api/v1/cameras/:id/stream", get(camera::stream_proxy))
         // WebSocket
         .route("/ws", get(ws_handler))
         // Middleware

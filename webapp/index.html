@@ -18,6 +18,7 @@
 
         <nav>
             <button data-view="devices" class="active">Devices</button>
+            <button data-view="cameras">Cameras</button>
             <button data-view="network">Network</button>
         </nav>
 
@@ -34,6 +35,54 @@
                     <p class="empty-state">No devices found. Click "Permit Join" to pair new devices.</p>
                 </div>
             </section>
+
+            <!-- Cameras View -->
+            <section id="cameras-view" class="view">
+                <div class="toolbar">
+                    <button id="add-camera-btn" class="btn btn-primary">
+                        Add Camera
+                    </button>
+                </div>
+                <div id="camera-list" class="camera-grid">
+                    <p class="empty-state">No cameras configured. Click "Add Camera" to add one.</p>
+                </div>
+            </section>
+
+            <!-- Add Camera Modal -->
+            <div id="add-camera-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h2>Add Camera</h2>
+                    <form id="add-camera-form">
+                        <div class="form-group">
+                            <label for="camera-name">Name</label>
+                            <input type="text" id="camera-name" placeholder="Living Room Camera" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="camera-type">Stream Type</label>
+                            <select id="camera-type">
+                                <option value="mjpeg">MJPEG (HTTP)</option>
+                                <option value="rtsp">RTSP (via FFmpeg)</option>
+                                <option value="webrtc">WebRTC</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="camera-url">Stream URL</label>
+                            <input type="text" id="camera-url" placeholder="http://192.168.1.100:8000/video_feed" required>
+                            <small id="camera-url-hint" class="form-hint">For RTSP: rtsp://host:554/stream1</small>
+                        </div>
+                        <div id="rtsp-credentials" class="form-group" style="display: none;">
+                            <label for="camera-username">Username (optional)</label>
+                            <input type="text" id="camera-username" placeholder="admin">
+                            <label for="camera-password" style="margin-top: 0.5rem;">Password (optional)</label>
+                            <input type="password" id="camera-password" placeholder="password">
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="cancel-camera-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Add</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <!-- Network View -->
             <section id="network-view" class="view">

@@ -8,6 +8,7 @@ class App {
         this.api = new Api();
         this.ws = new WebSocketManager(`ws://${location.host}/ws`);
         this.devices = [];
+        this.cameras = [];
 
         this.init();
     }
@@ -18,6 +19,9 @@ class App {
 
         // Set up button handlers
         this.setupButtons();
+
+        // Set up camera modal
+        this.setupCameraModal();
 
         // Set up WebSocket
         this.setupWebSocket();
@@ -48,6 +52,8 @@ class App {
             this.loadNetworkInfo();
         } else if (viewName === 'devices') {
             this.loadDevices();
+        } else if (viewName === 'cameras') {
+            this.loadCameras();
         }
     }
 
@@ -269,6 +275,168 @@ class App {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Camera methods
+    setupCameraModal() {
+        const modal = document.getElementById('add-camera-modal');
+        const addBtn = document.getElementById('add-camera-btn');
+        const cancelBtn = document.getElementById('cancel-camera-btn');
+        const form = document.getElementById('add-camera-form');
+        const typeSelect = document.getElementById('camera-type');
+        const rtspCredentials = document.getElementById('rtsp-credentials');
+        const urlInput = document.getElementById('camera-url');
+        const urlHint = document.getElementById('camera-url-hint');
+
+        // Show/hide RTSP credentials based on stream type
+        typeSelect.addEventListener('change', () => {
+            const isRtsp = typeSelect.value === 'rtsp';
+            rtspCredentials.style.display = isRtsp ? 'block' : 'none';
+            urlInput.placeholder = isRtsp
+                ? 'rtsp://192.168.1.166:554/stream1'
+                : 'http://192.168.1.100:8000/video_feed';
+            urlHint.style.display = isRtsp ? 'block' : 'none';
+        });
+
+        addBtn.addEventListener('click', () => {
+            modal.classList.remove('hidden');
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            form.reset();
+            rtspCredentials.style.display = 'none';
+        });
+
+        // Close modal on outside click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+                form.reset();
+                rtspCredentials.style.display = 'none';
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('camera-name').value;
+            const url = document.getElementById('camera-url').value;
+            const type = document.getElementById('camera-type').value;
+            const username = document.getElementById('camera-username').value || null;
+            const password = document.getElementById('camera-password').value || null;
+
+            try {
+                await this.api.addCamera(name, url, type, username, password);
+                modal.classList.add('hidden');
+                form.reset();
+                rtspCredentials.style.display = 'none';
+                this.loadCameras();
+            } catch (err) {
+                console.error('Failed to add camera:', err);
+                alert('Failed to add camera: ' + err.message);
+            }
+        });
+    }
+
+    async loadCameras() {
+        try {
+            this.cameras = await this.api.getCameras();
+            this.renderCameras();
+        } catch (e) {
+            console.error('Failed to load cameras:', e);
+        }
+    }
+
+    renderCameras() {
+        const container = document.getElementById('camera-list');
+
+        if (this.cameras.length === 0) {
+            container.innerHTML = `
+                <p class="empty-state">
+                    No cameras configured. Click "Add Camera" to add one.
+                </p>
+            `;
+            return;
+        }
+
+        container.innerHTML = this.cameras.map(camera => this.renderCameraCard(camera)).join('');
+
+        // Attach play/pause button handlers
+        container.querySelectorAll('.play-pause-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const card = e.target.closest('.camera-card');
+                const img = card.querySelector('.camera-stream img');
+                const placeholder = card.querySelector('.paused-message');
+                const isPlaying = btn.dataset.playing === 'true';
+
+                if (isPlaying) {
+                    // Pause - stop the stream
+                    img.src = '';
+                    img.style.display = 'none';
+                    if (placeholder) placeholder.style.display = 'block';
+                    btn.textContent = 'Play';
+                    btn.dataset.playing = 'false';
+                    btn.title = 'Play stream';
+                } else {
+                    // Play - start the stream
+                    const streamUrl = img.dataset.streamUrl;
+                    img.src = streamUrl;
+                    img.style.display = 'block';
+                    if (placeholder) placeholder.style.display = 'none';
+                    btn.textContent = 'Pause';
+                    btn.dataset.playing = 'true';
+                    btn.title = 'Pause stream';
+                }
+            });
+        });
+
+        // Attach delete button handlers
+        container.querySelectorAll('.delete-camera-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const card = e.target.closest('.camera-card');
+                const id = card.dataset.id;
+                const name = card.dataset.name;
+
+                if (confirm(`Delete camera "${name}"?`)) {
+                    try {
+                        await this.api.deleteCamera(id);
+                        this.loadCameras();
+                    } catch (err) {
+                        console.error('Failed to delete camera:', err);
+                    }
+                }
+            });
+        });
+    }
+
+    renderCameraCard(camera) {
+        const streamUrl = this.api.getCameraStreamUrl(camera.id);
+        const isWebRTC = camera.stream_type === 'webrtc';
+
+        return `
+            <div class="camera-card" data-id="${camera.id}" data-name="${this.escapeHtml(camera.name)}" data-stream-url="${streamUrl}">
+                <div class="camera-header">
+                    <h3>${this.escapeHtml(camera.name)}</h3>
+                    <div class="camera-controls">
+                        <button class="play-pause-btn btn btn-small" data-playing="false" title="Play stream">Play</button>
+                        <button class="delete-camera-btn btn btn-small btn-danger">Delete</button>
+                    </div>
+                </div>
+                <div class="camera-stream">
+                    ${isWebRTC
+                        ? `<p class="stream-placeholder">WebRTC streams not yet supported in UI</p>`
+                        : `<img src="" alt="${this.escapeHtml(camera.name)}" data-stream-url="${streamUrl}">
+                           <p class="stream-placeholder paused-message">Click Play to start stream</p>`
+                    }
+                </div>
+                <div class="camera-info">
+                    <span class="camera-type">${camera.stream_type.toUpperCase()}</span>
+                    <span class="camera-status ${camera.enabled ? 'enabled' : 'disabled'}">
+                        ${camera.enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                </div>
+            </div>
+        `;
     }
 }
 

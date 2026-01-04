@@ -296,6 +296,182 @@ footer {
     background-color: var(--error-color);
 }
 
+/* Camera grid */
+.camera-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1rem;
+}
+
+/* Camera card */
+.camera-card {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    border: 1px solid var(--surface-light);
+    transition: all 0.2s;
+}
+
+.camera-card:hover {
+    border-color: var(--primary-color);
+}
+
+.camera-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.camera-header h3 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.camera-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.play-pause-btn {
+    min-width: 60px;
+}
+
+.camera-stream {
+    background-color: var(--bg-color);
+    border-radius: 4px;
+    overflow: hidden;
+    aspect-ratio: 16 / 9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.camera-stream img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: none;
+}
+
+.camera-stream img[src]:not([src=""]) {
+    display: block;
+}
+
+.camera-stream img[src]:not([src=""]) + .paused-message {
+    display: none;
+}
+
+.camera-stream .stream-placeholder {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.camera-info {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    font-size: 0.75rem;
+}
+
+.camera-type {
+    padding: 0.25rem 0.5rem;
+    background-color: var(--secondary-color);
+    border-radius: 4px;
+}
+
+.camera-status.enabled {
+    color: var(--success-color);
+}
+
+.camera-status.disabled {
+    color: var(--error-color);
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal.hidden {
+    display: none;
+}
+
+.modal-content {
+    background-color: var(--surface-color);
+    border-radius: var(--border-radius);
+    padding: 2rem;
+    width: 90%;
+    max-width: 500px;
+    border: 1px solid var(--surface-light);
+}
+
+.modal-content h2 {
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+}
+
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--surface-light);
+    border-radius: 4px;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-size: 0.875rem;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: flex-end;
+    margin-top: 1.5rem;
+}
+
+.btn-small {
+    padding: 0.5rem 1rem;
+    font-size: 0.75rem;
+}
+
+.btn-danger {
+    background-color: var(--error-color);
+    color: white;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     header, nav, main, footer {
@@ -305,5 +481,9 @@ footer {
 
     .toolbar {
         flex-direction: column;
+    }
+
+    .camera-grid {
+        grid-template-columns: 1fr;
     }
 }

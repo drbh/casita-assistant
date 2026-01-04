@@ -27,50 +27,52 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
         return;
     }
 
-    // Subscribe to network events
-    let mut event_rx = state.network.subscribe();
+    // Spawn task to forward network events to WebSocket (only if network is available)
+    let send_task = if let Some(network) = &state.network {
+        let mut event_rx = network.subscribe();
+        Some(tokio::spawn(async move {
+            loop {
+                match event_rx.recv().await {
+                    Ok(event) => {
+                        let ws_event = match event {
+                            zigbee_core::network::NetworkEvent::DeviceJoined(device) => {
+                                WsEvent::DeviceJoined {
+                                    ieee_address: device.ieee_address_string(),
+                                }
+                            }
+                            zigbee_core::network::NetworkEvent::DeviceLeft { ieee_address } => {
+                                WsEvent::DeviceLeft {
+                                    ieee_address: format_ieee(&ieee_address),
+                                }
+                            }
+                            zigbee_core::network::NetworkEvent::DeviceUpdated { ieee_address } => {
+                                WsEvent::DeviceUpdated {
+                                    ieee_address: format_ieee(&ieee_address),
+                                }
+                            }
+                            zigbee_core::network::NetworkEvent::NetworkStateChanged {
+                                connected,
+                            } => WsEvent::NetworkStateChanged { connected },
+                        };
 
-    // Spawn task to forward network events to WebSocket
-    let send_task = tokio::spawn(async move {
-        loop {
-            match event_rx.recv().await {
-                Ok(event) => {
-                    let ws_event = match event {
-                        zigbee_core::network::NetworkEvent::DeviceJoined(device) => {
-                            WsEvent::DeviceJoined {
-                                ieee_address: device.ieee_address_string(),
-                            }
+                        let json = serde_json::to_string(&ws_event).unwrap();
+                        if sender.send(Message::Text(json)).await.is_err() {
+                            break;
                         }
-                        zigbee_core::network::NetworkEvent::DeviceLeft { ieee_address } => {
-                            WsEvent::DeviceLeft {
-                                ieee_address: format_ieee(&ieee_address),
-                            }
-                        }
-                        zigbee_core::network::NetworkEvent::DeviceUpdated { ieee_address } => {
-                            WsEvent::DeviceUpdated {
-                                ieee_address: format_ieee(&ieee_address),
-                            }
-                        }
-                        zigbee_core::network::NetworkEvent::NetworkStateChanged { connected } => {
-                            WsEvent::NetworkStateChanged { connected }
-                        }
-                    };
-
-                    let json = serde_json::to_string(&ws_event).unwrap();
-                    if sender.send(Message::Text(json)).await.is_err() {
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        // Skip missed messages
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
                         break;
                     }
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
-                    // Skip missed messages
-                    continue;
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                    break;
-                }
             }
-        }
-    });
+        }))
+    } else {
+        None
+    };
 
     // Handle incoming messages (for future use)
     while let Some(msg) = receiver.next().await {
@@ -85,7 +87,9 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
     }
 
     // Clean up
-    send_task.abort();
+    if let Some(task) = send_task {
+        task.abort();
+    }
 }
 
 fn format_ieee(ieee: &[u8; 8]) -> String {

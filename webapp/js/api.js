@@ -85,4 +85,32 @@ export class Api {
             transition,
         });
     }
+
+    // Camera endpoints
+    getCameras() {
+        return this.get('/api/v1/cameras');
+    }
+
+    getCamera(id) {
+        return this.get(`/api/v1/cameras/${id}`);
+    }
+
+    addCamera(name, streamUrl, streamType = 'mjpeg', username = null, password = null) {
+        const body = {
+            name,
+            stream_url: streamUrl,
+            stream_type: streamType,
+        };
+        if (username) body.username = username;
+        if (password) body.password = password;
+        return this.post('/api/v1/cameras', body);
+    }
+
+    deleteCamera(id) {
+        return this.delete(`/api/v1/cameras/${id}`);
+    }
+
+    getCameraStreamUrl(id) {
+        return `${this.baseUrl}/api/v1/cameras/${id}/stream`;
+    }
 }
