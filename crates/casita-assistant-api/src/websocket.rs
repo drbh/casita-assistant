@@ -11,10 +11,18 @@ use crate::AppState;
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum WsEvent {
     Connected,
-    DeviceJoined { ieee_address: String },
-    DeviceLeft { ieee_address: String },
-    DeviceUpdated { ieee_address: String },
-    NetworkStateChanged { connected: bool },
+    DeviceJoined {
+        ieee_address: String,
+    },
+    DeviceLeft {
+        ieee_address: String,
+    },
+    DeviceUpdated {
+        ieee_address: String,
+    },
+    NetworkStateChanged {
+        connected: bool,
+    },
     // Device state events
     DeviceStateChanged {
         ieee_address: String,
@@ -22,12 +30,27 @@ pub enum WsEvent {
         state_on: bool,
     },
     // Automation events
-    AutomationTriggered { automation_id: String, trigger_reason: String },
-    AutomationActionExecuted { automation_id: String, action_index: usize },
-    AutomationFailed { automation_id: String, error: String },
-    AutomationCreated { automation_id: String },
-    AutomationUpdated { automation_id: String },
-    AutomationDeleted { automation_id: String },
+    AutomationTriggered {
+        automation_id: String,
+        trigger_reason: String,
+    },
+    AutomationActionExecuted {
+        automation_id: String,
+        action_index: usize,
+    },
+    AutomationFailed {
+        automation_id: String,
+        error: String,
+    },
+    AutomationCreated {
+        automation_id: String,
+    },
+    AutomationUpdated {
+        automation_id: String,
+    },
+    AutomationDeleted {
+        automation_id: String,
+    },
 }
 
 /// Handle a WebSocket connection
@@ -100,15 +123,27 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
             match automation_rx.recv().await {
                 Ok(event) => {
                     let ws_event = match event {
-                        automation_engine::AutomationEvent::Triggered { automation_id, trigger_reason } => {
-                            WsEvent::AutomationTriggered { automation_id, trigger_reason }
-                        }
-                        automation_engine::AutomationEvent::ActionExecuted { automation_id, action_index } => {
-                            WsEvent::AutomationActionExecuted { automation_id, action_index }
-                        }
-                        automation_engine::AutomationEvent::Failed { automation_id, error } => {
-                            WsEvent::AutomationFailed { automation_id, error }
-                        }
+                        automation_engine::AutomationEvent::Triggered {
+                            automation_id,
+                            trigger_reason,
+                        } => WsEvent::AutomationTriggered {
+                            automation_id,
+                            trigger_reason,
+                        },
+                        automation_engine::AutomationEvent::ActionExecuted {
+                            automation_id,
+                            action_index,
+                        } => WsEvent::AutomationActionExecuted {
+                            automation_id,
+                            action_index,
+                        },
+                        automation_engine::AutomationEvent::Failed {
+                            automation_id,
+                            error,
+                        } => WsEvent::AutomationFailed {
+                            automation_id,
+                            error,
+                        },
                         automation_engine::AutomationEvent::Created { automation_id } => {
                             WsEvent::AutomationCreated { automation_id }
                         }

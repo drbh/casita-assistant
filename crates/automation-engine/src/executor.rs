@@ -116,10 +116,9 @@ impl ActionExecutor {
         endpoint: u8,
         command: &DeviceCommand,
     ) -> Result<(), AutomationError> {
-        let network = self
-            .network
-            .as_ref()
-            .ok_or_else(|| AutomationError::DeviceControlFailed("No network available".to_string()))?;
+        let network = self.network.as_ref().ok_or_else(|| {
+            AutomationError::DeviceControlFailed("No network available".to_string())
+        })?;
 
         let ieee = parse_ieee_address(device_ieee)?;
 

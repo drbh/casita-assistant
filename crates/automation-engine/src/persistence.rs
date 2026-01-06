@@ -29,7 +29,10 @@ pub async fn load_automations(path: &Path) -> Vec<Automation> {
 }
 
 /// Save automations to a JSON file atomically
-pub async fn save_automations(path: &Path, automations: &[Automation]) -> Result<(), std::io::Error> {
+pub async fn save_automations(
+    path: &Path,
+    automations: &[Automation],
+) -> Result<(), std::io::Error> {
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).await?;

@@ -1,23 +1,27 @@
 //! Casita Assistant - Zigbee Control API Server
 
+use automation_engine::{AutomationEngine, CreateAutomationRequest, UpdateAutomationRequest};
+#[cfg(not(feature = "embed-frontend"))]
+use axum::response::Html;
 use axum::{
     extract::{Path, State, WebSocketUpgrade},
     http::StatusCode,
-    response::{Html, IntoResponse},
+    response::IntoResponse,
     routing::{get, post},
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
+#[cfg(not(feature = "embed-frontend"))]
+use tower_http::services::ServeDir;
+use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use zigbee_core::{DeviceCategory, ZigbeeNetwork};
-use automation_engine::{
-    AutomationEngine, CreateAutomationRequest, UpdateAutomationRequest,
-};
 
 mod camera;
 mod rtsp;
+#[cfg(feature = "embed-frontend")]
+mod static_files;
 mod websocket;
 
 use camera::CameraManager;
@@ -594,7 +598,8 @@ async fn disable_automation(
     }
 }
 
-/// Serve the frontend
+/// Serve the frontend (legacy mode - for development with vanilla JS)
+#[cfg(not(feature = "embed-frontend"))]
 async fn index() -> Html<&'static str> {
     Html(include_str!("../../../webapp/index.html"))
 }
@@ -671,23 +676,25 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Initialize automation engine
-    let automations = match AutomationEngine::new(
-        network.clone(),
-        std::path::Path::new(&data_dir),
-    )
-    .await
-    {
-        Ok(engine) => {
-            let engine = Arc::new(engine);
-            engine.start();
-            tracing::info!("Automation engine started with {} automations", engine.list().len());
-            engine
-        }
-        Err(e) => {
-            tracing::error!("Failed to initialize automation engine: {}", e);
-            return Err(anyhow::anyhow!("Failed to initialize automation engine: {}", e));
-        }
-    };
+    let automations =
+        match AutomationEngine::new(network.clone(), std::path::Path::new(&data_dir)).await {
+            Ok(engine) => {
+                let engine = Arc::new(engine);
+                engine.start();
+                tracing::info!(
+                    "Automation engine started with {} automations",
+                    engine.list().len()
+                );
+                engine
+            }
+            Err(e) => {
+                tracing::error!("Failed to initialize automation engine: {}", e);
+                return Err(anyhow::anyhow!(
+                    "Failed to initialize automation engine: {}",
+                    e
+                ));
+            }
+        };
 
     let state = AppState {
         network,
@@ -695,12 +702,8 @@ async fn main() -> anyhow::Result<()> {
         automations,
     };
 
-    // Build the router
+    // Build the router - API routes first (take priority over frontend)
     let app = Router::new()
-        // Frontend
-        .route("/", get(index))
-        .nest_service("/css", ServeDir::new("webapp/css"))
-        .nest_service("/js", ServeDir::new("webapp/js"))
         // API routes
         .route("/health", get(health))
         .route("/api/v1/system/info", get(system_info))
@@ -736,8 +739,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/automations", get(list_automations))
         .route("/api/v1/automations", post(create_automation))
         .route("/api/v1/automations/:id", get(get_automation))
-        .route("/api/v1/automations/:id", axum::routing::put(update_automation))
-        .route("/api/v1/automations/:id", axum::routing::delete(delete_automation))
+        .route(
+            "/api/v1/automations/:id",
+            axum::routing::put(update_automation),
+        )
+        .route(
+            "/api/v1/automations/:id",
+            axum::routing::delete(delete_automation),
+        )
         .route("/api/v1/automations/:id/trigger", post(trigger_automation))
         .route("/api/v1/automations/:id/enable", post(enable_automation))
         .route("/api/v1/automations/:id/disable", post(disable_automation))
@@ -747,6 +756,21 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
+
+    // Add frontend serving based on feature flags
+    #[cfg(feature = "embed-frontend")]
+    let app = {
+        tracing::info!("Serving embedded frontend assets");
+        app.fallback(static_files::serve_embedded)
+    };
+
+    #[cfg(not(feature = "embed-frontend"))]
+    let app = {
+        tracing::info!("Serving frontend from filesystem (legacy mode)");
+        app.route("/", get(index))
+            .nest_service("/css", ServeDir::new("webapp/css"))
+            .nest_service("/js", ServeDir::new("webapp/js"))
+    };
 
     // Start server
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3000));

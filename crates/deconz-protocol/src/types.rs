@@ -684,7 +684,8 @@ impl ApsDataRequest {
     }
 }
 
-/// ZCL frame builder
+/// ZCL frame (Zigbee Cluster Library)
+#[derive(Debug, Clone)]
 pub struct ZclFrame {
     frame_control: u8,
     manufacturer_code: Option<u16>,
@@ -694,6 +695,72 @@ pub struct ZclFrame {
 }
 
 impl ZclFrame {
+    /// Parse a ZCL frame from raw ASDU bytes
+    pub fn parse(data: &[u8]) -> Result<Self, ProtocolError> {
+        if data.len() < 3 {
+            return Err(ProtocolError::FrameTooShort(data.len()));
+        }
+
+        let frame_control = data[0];
+        let mut idx = 1;
+
+        // Check for manufacturer-specific (bit 2)
+        let manufacturer_code = if (frame_control & 0x04) != 0 {
+            if data.len() < idx + 2 {
+                return Err(ProtocolError::FrameTooShort(data.len()));
+            }
+            let code = u16::from_le_bytes([data[idx], data[idx + 1]]);
+            idx += 2;
+            Some(code)
+        } else {
+            None
+        };
+
+        if data.len() < idx + 2 {
+            return Err(ProtocolError::FrameTooShort(data.len()));
+        }
+
+        let transaction_seq = data[idx];
+        idx += 1;
+        let command_id = data[idx];
+        idx += 1;
+
+        let payload = data[idx..].to_vec();
+
+        Ok(Self {
+            frame_control,
+            manufacturer_code,
+            transaction_seq,
+            command_id,
+            payload,
+        })
+    }
+
+    /// Get frame control byte
+    pub fn frame_control(&self) -> u8 {
+        self.frame_control
+    }
+
+    /// Check if this is a cluster-specific command (vs global)
+    pub fn is_cluster_specific(&self) -> bool {
+        (self.frame_control & 0x03) == 0x01
+    }
+
+    /// Check if this is from server to client (vs client to server)
+    pub fn is_from_server(&self) -> bool {
+        (self.frame_control & 0x08) != 0
+    }
+
+    /// Get the command ID
+    pub fn command_id(&self) -> u8 {
+        self.command_id
+    }
+
+    /// Get the payload
+    pub fn payload(&self) -> &[u8] {
+        &self.payload
+    }
+
     /// Create a cluster-specific command frame (client to server)
     pub fn cluster_command(transaction_seq: u8, command_id: u8) -> Self {
         Self {

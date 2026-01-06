@@ -2,7 +2,7 @@
 
 use crate::error::AutomationError;
 use crate::model::{Automation, ScheduleSpec, Trigger};
-use chrono::{Local, NaiveTime, Datelike};
+use chrono::{Datelike, Local, NaiveTime};
 use cron::Schedule;
 use dashmap::DashMap;
 use std::str::FromStr;
@@ -195,11 +195,7 @@ impl Scheduler {
     }
 
     /// Schedule a cron-based trigger
-    fn schedule_cron(
-        &self,
-        automation_id: &str,
-        expression: &str,
-    ) -> Result<(), AutomationError> {
+    fn schedule_cron(&self, automation_id: &str, expression: &str) -> Result<(), AutomationError> {
         let schedule = Schedule::from_str(expression)
             .map_err(|e| AutomationError::InvalidCron(format!("{}: {}", expression, e)))?;
 

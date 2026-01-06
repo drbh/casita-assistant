@@ -211,8 +211,79 @@ impl ZigbeeNetwork {
                         }
                     }
                     Ok(DeconzEvent::ApsIndication(indication)) => {
+                        // Handle Home Automation profile (button presses, device commands)
+                        if indication.profile_id == profiles::HOME_AUTOMATION {
+                            // Parse ZCL frame from ASDU
+                            if let Ok(zcl) = ZclFrame::parse(&indication.asdu) {
+                                // Handle On/Off cluster commands
+                                if indication.cluster_id == clusters::ON_OFF
+                                    && zcl.is_cluster_specific()
+                                {
+                                    let cmd_id = zcl.command_id();
+                                    let state_on = match cmd_id {
+                                        0x00 => Some(false), // Off
+                                        0x01 => Some(true),  // On
+                                        0x02 => None,        // Toggle (will resolve to opposite)
+                                        _ => {
+                                            tracing::debug!(
+                                                "Unknown On/Off command: {:#04x}",
+                                                cmd_id
+                                            );
+                                            continue;
+                                        }
+                                    };
+
+                                    // Find the source device by short address
+                                    let mut found_device = None;
+                                    for entry in devices.iter() {
+                                        if entry.nwk_address == indication.src_short_addr {
+                                            found_device =
+                                                Some((entry.ieee_address, indication.src_endpoint));
+                                            break;
+                                        }
+                                    }
+
+                                    if let Some((ieee_address, endpoint)) = found_device {
+                                        let resolved_state = match state_on {
+                                            Some(s) => s,
+                                            None => {
+                                                // Toggle: get current state and flip it
+                                                devices
+                                                    .get(&ieee_address)
+                                                    .map(|d| !d.state_on.unwrap_or(false))
+                                                    .unwrap_or(true)
+                                            }
+                                        };
+
+                                        tracing::info!(
+                                            "Device {:#04x} sent On/Off command: {} (state={})",
+                                            indication.src_short_addr,
+                                            match cmd_id {
+                                                0x00 => "Off",
+                                                0x01 => "On",
+                                                0x02 => "Toggle",
+                                                _ => "?",
+                                            },
+                                            resolved_state
+                                        );
+
+                                        // Emit event for automation engine
+                                        let _ = event_tx.send(NetworkEvent::DeviceStateChanged {
+                                            ieee_address,
+                                            endpoint,
+                                            state_on: resolved_state,
+                                        });
+                                    } else {
+                                        tracing::debug!(
+                                            "On/Off command from unknown device {:#06x}",
+                                            indication.src_short_addr
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         // Handle ZDO responses
-                        if indication.profile_id == profiles::ZDO {
+                        else if indication.profile_id == profiles::ZDO {
                             match indication.cluster_id {
                                 x if x == ZdoCluster::ActiveEpRsp as u16 => {
                                     if let Ok(resp) =

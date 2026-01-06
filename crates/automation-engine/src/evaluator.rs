@@ -2,7 +2,7 @@
 
 use crate::error::AutomationError;
 use crate::model::Condition;
-use chrono::{Local, NaiveTime, Datelike};
+use chrono::{Datelike, Local, NaiveTime};
 use std::sync::Arc;
 use zigbee_core::ZigbeeNetwork;
 
@@ -32,9 +32,10 @@ impl ConditionEvaluator {
         match condition {
             Condition::TimeRange { start, end } => self.evaluate_time_range(start, end),
             Condition::DayOfWeek { days } => self.evaluate_day_of_week(days),
-            Condition::DeviceAvailable { device_ieee, available } => {
-                self.evaluate_device_available(device_ieee, *available)
-            }
+            Condition::DeviceAvailable {
+                device_ieee,
+                available,
+            } => self.evaluate_device_available(device_ieee, *available),
             Condition::And { conditions } => {
                 for c in conditions {
                     if !self.evaluate(c)? {

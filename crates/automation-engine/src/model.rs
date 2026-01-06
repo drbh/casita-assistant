@@ -121,17 +121,11 @@ pub enum Condition {
         available: bool,
     },
     /// Logical AND of multiple conditions
-    And {
-        conditions: Vec<Condition>,
-    },
+    And { conditions: Vec<Condition> },
     /// Logical OR of multiple conditions
-    Or {
-        conditions: Vec<Condition>,
-    },
+    Or { conditions: Vec<Condition> },
     /// Negate a condition
-    Not {
-        condition: Box<Condition>,
-    },
+    Not { condition: Box<Condition> },
 }
 
 /// Actions to perform when automation triggers

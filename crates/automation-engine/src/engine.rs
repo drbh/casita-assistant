@@ -33,17 +33,11 @@ pub enum AutomationEvent {
         error: String,
     },
     /// An automation was created
-    Created {
-        automation_id: String,
-    },
+    Created { automation_id: String },
     /// An automation was updated
-    Updated {
-        automation_id: String,
-    },
+    Updated { automation_id: String },
     /// An automation was deleted
-    Deleted {
-        automation_id: String,
-    },
+    Deleted { automation_id: String },
 }
 
 /// The main automation engine
@@ -99,11 +93,7 @@ impl AutomationEngine {
         for automation in automations {
             // Register with scheduler if needed
             if let Err(e) = self.scheduler.register(&automation) {
-                tracing::warn!(
-                    "Failed to schedule automation {}: {}",
-                    automation.id,
-                    e
-                );
+                tracing::warn!("Failed to schedule automation {}: {}", automation.id, e);
             }
             self.automations.insert(automation.id.clone(), automation);
         }
@@ -112,11 +102,8 @@ impl AutomationEngine {
 
     /// Save automations to disk
     async fn save(&self) -> Result<(), AutomationError> {
-        let automations: Vec<Automation> = self
-            .automations
-            .iter()
-            .map(|r| r.value().clone())
-            .collect();
+        let automations: Vec<Automation> =
+            self.automations.iter().map(|r| r.value().clone()).collect();
         persistence::save_automations(&self.data_path, &automations).await?;
         Ok(())
     }
@@ -165,7 +152,11 @@ impl AutomationEngine {
             automation_id: automation.id.clone(),
         });
 
-        tracing::info!("Created automation: {} ({})", automation.name, automation.id);
+        tracing::info!(
+            "Created automation: {} ({})",
+            automation.name,
+            automation.id
+        );
         Ok(automation)
     }
 
@@ -330,11 +321,7 @@ impl AutomationEngine {
 
             if self.trigger_matches(&automation.trigger, &event) {
                 if let Err(e) = self.execute_automation(automation, "device_state").await {
-                    tracing::error!(
-                        "Failed to execute automation '{}': {}",
-                        automation.name,
-                        e
-                    );
+                    tracing::error!("Failed to execute automation '{}': {}", automation.name, e);
                 }
             }
         }
