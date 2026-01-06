@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 deconz-protocol = { workspace = true }
 zigbee-core = { workspace = true }
+automation-engine = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true }
 tower-http = { workspace = true }

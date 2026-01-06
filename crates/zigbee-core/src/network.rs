@@ -1,6 +1,6 @@
 //! Zigbee network management
 
-use crate::device::{DeviceType, ZigbeeDevice};
+use crate::device::{DeviceCategory, DeviceType, ZigbeeDevice};
 use crate::persistence;
 use dashmap::DashMap;
 use deconz_protocol::{
@@ -38,6 +38,12 @@ pub enum NetworkEvent {
     DeviceUpdated { ieee_address: [u8; 8] },
     /// Network state changed
     NetworkStateChanged { connected: bool },
+    /// Device on/off state changed
+    DeviceStateChanged {
+        ieee_address: [u8; 8],
+        endpoint: u8,
+        state_on: bool,
+    },
 }
 
 /// Network status information
@@ -461,6 +467,7 @@ impl ZigbeeNetwork {
             .ok_or_else(|| NetworkError::DeviceNotFound(format!("{ieee:02X?}")))?;
 
         let short_addr = device.nwk_address;
+        let current_state = device.state_on;
         drop(device); // Release the lock
 
         // Build ZCL frame
@@ -478,6 +485,30 @@ impl ZigbeeNetwork {
         );
 
         self.transport.send_aps_request(request).await?;
+
+        // Determine new state and emit event
+        let new_state = match command {
+            OnOffCommand::On => Some(true),
+            OnOffCommand::Off => Some(false),
+            OnOffCommand::Toggle => current_state.map(|s| !s),
+        };
+
+        if let Some(state_on) = new_state {
+            // Update device state
+            if let Some(mut device) = self.devices.get_mut(ieee) {
+                device.state_on = Some(state_on);
+            }
+
+            // Emit state change event
+            let _ = self.event_tx.send(NetworkEvent::DeviceStateChanged {
+                ieee_address: *ieee,
+                endpoint,
+                state_on,
+            });
+
+            // Persist
+            self.save_devices();
+        }
 
         Ok(())
     }
@@ -543,5 +574,38 @@ impl ZigbeeNetwork {
         self.transport.send_aps_request(request).await?;
 
         Ok(())
+    }
+
+    /// Update device metadata (friendly name and category)
+    pub fn update_device_metadata(
+        &self,
+        ieee: &[u8; 8],
+        friendly_name: Option<String>,
+        category: Option<DeviceCategory>,
+    ) -> Result<ZigbeeDevice, NetworkError> {
+        let mut device = self
+            .devices
+            .get_mut(ieee)
+            .ok_or_else(|| NetworkError::DeviceNotFound(format!("{ieee:02X?}")))?;
+
+        if let Some(name) = friendly_name {
+            device.friendly_name = if name.is_empty() { None } else { Some(name) };
+        }
+        if let Some(cat) = category {
+            device.category = cat;
+        }
+
+        let updated_device = device.clone();
+        drop(device);
+
+        // Emit update event
+        let _ = self.event_tx.send(NetworkEvent::DeviceUpdated {
+            ieee_address: *ieee,
+        });
+
+        // Persist changes
+        self.save_devices();
+
+        Ok(updated_device)
     }
 }

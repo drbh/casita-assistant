@@ -3,13 +3,34 @@
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-/// Zigbee device types
+/// Zigbee device types (network role)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum DeviceType {
     Coordinator,
     Router,
     EndDevice,
+}
+
+/// Device category for user classification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceCategory {
+    Light,
+    Outlet,
+    Switch,
+    Sensor,
+    Lock,
+    Thermostat,
+    Fan,
+    Blinds,
+    Other,
+}
+
+impl Default for DeviceCategory {
+    fn default() -> Self {
+        Self::Other
+    }
 }
 
 /// A Zigbee device on the network
@@ -19,8 +40,11 @@ pub struct ZigbeeDevice {
     pub ieee_address: [u8; 8],
     /// Network short address
     pub nwk_address: u16,
-    /// Device type
+    /// Device type (network role)
     pub device_type: DeviceType,
+    /// User-assigned device category
+    #[serde(default)]
+    pub category: DeviceCategory,
     /// Manufacturer name (from Basic cluster)
     pub manufacturer: Option<String>,
     /// Model identifier (from Basic cluster)
@@ -36,6 +60,9 @@ pub struct ZigbeeDevice {
     pub lqi: Option<u8>,
     /// Is device reachable
     pub available: bool,
+    /// Current on/off state (if applicable)
+    #[serde(default)]
+    pub state_on: Option<bool>,
 }
 
 impl ZigbeeDevice {
@@ -45,6 +72,7 @@ impl ZigbeeDevice {
             ieee_address,
             nwk_address,
             device_type: DeviceType::EndDevice,
+            category: DeviceCategory::default(),
             manufacturer: None,
             model: None,
             friendly_name: None,
@@ -52,6 +80,7 @@ impl ZigbeeDevice {
             last_seen: None,
             lqi: None,
             available: true,
+            state_on: None,
         }
     }
 

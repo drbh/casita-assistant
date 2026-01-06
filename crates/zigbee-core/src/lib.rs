@@ -8,5 +8,5 @@ pub mod device;
 pub mod network;
 pub mod persistence;
 
-pub use device::{DeviceType, Endpoint, ZigbeeDevice};
-pub use network::ZigbeeNetwork;
+pub use device::{DeviceCategory, DeviceType, Endpoint, ZigbeeDevice};
+pub use network::{NetworkEvent, ZigbeeNetwork};

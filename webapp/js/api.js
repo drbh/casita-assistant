@@ -86,6 +86,13 @@ export class Api {
         });
     }
 
+    updateDevice(ieee, friendlyName, category) {
+        return this.put(`/api/v1/devices/${ieee}`, {
+            friendly_name: friendlyName || null,
+            category: category || null,
+        });
+    }
+
     // Camera endpoints
     getCameras() {
         return this.get('/api/v1/cameras');
@@ -112,5 +119,38 @@ export class Api {
 
     getCameraStreamUrl(id) {
         return `${this.baseUrl}/api/v1/cameras/${id}/stream`;
+    }
+
+    // Automation endpoints
+    getAutomations() {
+        return this.get('/api/v1/automations');
+    }
+
+    getAutomation(id) {
+        return this.get(`/api/v1/automations/${id}`);
+    }
+
+    createAutomation(automation) {
+        return this.post('/api/v1/automations', automation);
+    }
+
+    updateAutomation(id, automation) {
+        return this.put(`/api/v1/automations/${id}`, automation);
+    }
+
+    deleteAutomation(id) {
+        return this.delete(`/api/v1/automations/${id}`);
+    }
+
+    triggerAutomation(id) {
+        return this.post(`/api/v1/automations/${id}/trigger`);
+    }
+
+    enableAutomation(id) {
+        return this.post(`/api/v1/automations/${id}/enable`);
+    }
+
+    disableAutomation(id) {
+        return this.post(`/api/v1/automations/${id}/disable`);
     }
 }

@@ -18,6 +18,7 @@
 
         <nav>
             <button data-view="devices" class="active">Devices</button>
+            <button data-view="automations">Automations</button>
             <button data-view="cameras">Cameras</button>
             <button data-view="network">Network</button>
         </nav>
@@ -35,6 +36,122 @@
                     <p class="empty-state">No devices found. Click "Permit Join" to pair new devices.</p>
                 </div>
             </section>
+
+            <!-- Automations View -->
+            <section id="automations-view" class="view">
+                <div class="toolbar">
+                    <button id="add-automation-btn" class="btn btn-primary">
+                        Add Automation
+                    </button>
+                    <button id="refresh-automations-btn" class="btn">Refresh</button>
+                </div>
+                <div id="automation-list" class="automation-grid">
+                    <p class="empty-state">No automations configured. Click "Add Automation" to create one.</p>
+                </div>
+            </section>
+
+            <!-- Add/Edit Automation Modal -->
+            <div id="automation-modal" class="modal hidden">
+                <div class="modal-content modal-large">
+                    <h2 id="automation-modal-title">Add Automation</h2>
+                    <form id="automation-form">
+                        <input type="hidden" id="automation-id">
+
+                        <div class="form-group">
+                            <label for="automation-name">Name</label>
+                            <input type="text" id="automation-name" placeholder="e.g., Evening Lights" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="automation-description">Description (optional)</label>
+                            <input type="text" id="automation-description" placeholder="Turn on lights at sunset">
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Trigger</h3>
+                            <div class="form-group">
+                                <label for="trigger-type">Trigger Type</label>
+                                <select id="trigger-type">
+                                    <option value="manual">Manual Only</option>
+                                    <option value="schedule">Schedule</option>
+                                    <option value="device_state">Device State Change</option>
+                                </select>
+                            </div>
+
+                            <!-- Schedule Trigger Options -->
+                            <div id="schedule-options" class="trigger-options hidden">
+                                <div class="form-group">
+                                    <label for="schedule-type">Schedule Type</label>
+                                    <select id="schedule-type">
+                                        <option value="time_of_day">Time of Day</option>
+                                        <option value="interval">Interval</option>
+                                    </select>
+                                </div>
+                                <div id="time-of-day-options">
+                                    <div class="form-group">
+                                        <label for="schedule-time">Time (HH:MM)</label>
+                                        <input type="time" id="schedule-time" value="18:00">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Days</label>
+                                        <div class="day-picker">
+                                            <label><input type="checkbox" name="schedule-day" value="0"> Sun</label>
+                                            <label><input type="checkbox" name="schedule-day" value="1" checked> Mon</label>
+                                            <label><input type="checkbox" name="schedule-day" value="2" checked> Tue</label>
+                                            <label><input type="checkbox" name="schedule-day" value="3" checked> Wed</label>
+                                            <label><input type="checkbox" name="schedule-day" value="4" checked> Thu</label>
+                                            <label><input type="checkbox" name="schedule-day" value="5" checked> Fri</label>
+                                            <label><input type="checkbox" name="schedule-day" value="6"> Sat</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="interval-options" class="hidden">
+                                    <div class="form-group">
+                                        <label for="interval-seconds">Interval (seconds)</label>
+                                        <input type="number" id="interval-seconds" value="300" min="10">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Device State Trigger Options -->
+                            <div id="device-state-options" class="trigger-options hidden">
+                                <div class="form-group">
+                                    <label for="trigger-device">Device</label>
+                                    <select id="trigger-device">
+                                        <option value="">Select a device...</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="state-change">State Change</label>
+                                    <select id="state-change">
+                                        <option value="any">Any Update</option>
+                                        <option value="turned_on">Turned On</option>
+                                        <option value="turned_off">Turned Off</option>
+                                        <option value="toggled">Toggled (On or Off)</option>
+                                        <option value="joined">Device Joined</option>
+                                        <option value="left">Device Left</option>
+                                        <option value="available">Became Available</option>
+                                        <option value="unavailable">Became Unavailable</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Actions</h3>
+                            <div id="actions-list">
+                                <!-- Actions will be added here dynamically -->
+                            </div>
+                            <button type="button" id="add-action-btn" class="btn btn-small">+ Add Action</button>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="cancel-automation-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
 
             <!-- Cameras View -->
             <section id="cameras-view" class="view">
@@ -79,6 +196,39 @@
                         <div class="form-actions">
                             <button type="button" class="btn" id="cancel-camera-btn">Cancel</button>
                             <button type="submit" class="btn btn-primary">Add</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Edit Device Modal -->
+            <div id="edit-device-modal" class="modal hidden">
+                <div class="modal-content">
+                    <h2>Edit Device</h2>
+                    <form id="edit-device-form">
+                        <input type="hidden" id="edit-device-ieee">
+                        <div id="edit-device-info" class="device-info-block"></div>
+                        <div class="form-group">
+                            <label for="edit-device-name">Friendly Name</label>
+                            <input type="text" id="edit-device-name" placeholder="e.g., Living Room Outlet">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-device-category">Device Category</label>
+                            <select id="edit-device-category">
+                                <option value="other">Other</option>
+                                <option value="light">Light</option>
+                                <option value="outlet">Outlet</option>
+                                <option value="switch">Switch</option>
+                                <option value="sensor">Sensor</option>
+                                <option value="lock">Lock</option>
+                                <option value="thermostat">Thermostat</option>
+                                <option value="fan">Fan</option>
+                                <option value="blinds">Blinds</option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="btn" id="cancel-device-btn">Cancel</button>
+                            <button type="submit" class="btn btn-primary">Save</button>
                         </div>
                     </form>
                 </div>

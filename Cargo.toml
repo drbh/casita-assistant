@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/deconz-protocol",
     "crates/zigbee-core",
+    "crates/automation-engine",
     "crates/casita-assistant-api",
 ]
 
@@ -37,3 +38,4 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Internal crates
 deconz-protocol = { path = "crates/deconz-protocol" }
 zigbee-core = { path = "crates/zigbee-core" }
+automation-engine = { path = "crates/automation-engine" }

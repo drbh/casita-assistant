@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::{cors::CorsLayer, services::ServeDir, trace::TraceLayer};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use zigbee_core::ZigbeeNetwork;
+use zigbee_core::{DeviceCategory, ZigbeeNetwork};
+use automation_engine::{
+    AutomationEngine, CreateAutomationRequest, UpdateAutomationRequest,
+};
 
 mod camera;
 mod rtsp;
@@ -24,6 +27,7 @@ use camera::CameraManager;
 pub struct AppState {
     pub network: Option<Arc<ZigbeeNetwork>>,
     pub cameras: Arc<CameraManager>,
+    pub automations: Arc<AutomationEngine>,
 }
 
 /// API response wrapper using serde_json::Value for flexibility
@@ -202,6 +206,50 @@ async fn discover_device(
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::error(e.to_string())),
         ),
+    }
+}
+
+/// Request body for updating device metadata
+#[derive(Deserialize)]
+struct UpdateDeviceRequest {
+    #[serde(default)]
+    friendly_name: Option<String>,
+    #[serde(default)]
+    category: Option<DeviceCategory>,
+}
+
+/// Update device metadata (friendly name and category)
+async fn update_device(
+    State(state): State<AppState>,
+    Path(ieee): Path<String>,
+    Json(request): Json<UpdateDeviceRequest>,
+) -> impl IntoResponse {
+    let Some(network) = &state.network else {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Json(ApiResponse::error("Zigbee network not available")),
+        );
+    };
+    let ieee_bytes = match parse_ieee_address(&ieee) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(ApiResponse::error("Invalid IEEE address format")),
+            )
+        }
+    };
+
+    match network.update_device_metadata(&ieee_bytes, request.friendly_name, request.category) {
+        Ok(device) => (StatusCode::OK, Json(ApiResponse::success(device))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ApiResponse::error(e.to_string())))
+        }
     }
 }
 
@@ -409,6 +457,143 @@ async fn health() -> impl IntoResponse {
     Json(serde_json::json!({ "status": "ok" }))
 }
 
+// ============================================================================
+// Automation handlers
+// ============================================================================
+
+/// List all automations
+async fn list_automations(State(state): State<AppState>) -> impl IntoResponse {
+    let automations = state.automations.list();
+    Json(ApiResponse::success(automations))
+}
+
+/// Get a specific automation
+async fn get_automation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.automations.get(&id) {
+        Some(automation) => (StatusCode::OK, Json(ApiResponse::success(automation))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::error("Automation not found")),
+        ),
+    }
+}
+
+/// Create a new automation
+async fn create_automation(
+    State(state): State<AppState>,
+    Json(request): Json<CreateAutomationRequest>,
+) -> impl IntoResponse {
+    match state.automations.create(request).await {
+        Ok(automation) => (StatusCode::CREATED, Json(ApiResponse::success(automation))),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error(e.to_string())),
+        ),
+    }
+}
+
+/// Update an automation
+async fn update_automation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(request): Json<UpdateAutomationRequest>,
+) -> impl IntoResponse {
+    match state.automations.update(&id, request).await {
+        Ok(automation) => (StatusCode::OK, Json(ApiResponse::success(automation))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            (status, Json(ApiResponse::error(e.to_string())))
+        }
+    }
+}
+
+/// Delete an automation
+async fn delete_automation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.automations.delete(&id).await {
+        Ok(automation) => (StatusCode::OK, Json(ApiResponse::success(automation))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ApiResponse::error(e.to_string())))
+        }
+    }
+}
+
+/// Manually trigger an automation
+async fn trigger_automation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.automations.trigger(&id).await {
+        Ok(_) => (
+            StatusCode::OK,
+            Json(ApiResponse::success(serde_json::json!({
+                "status": "triggered",
+                "automation_id": id
+            }))),
+        ),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else if e.to_string().contains("disabled") {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ApiResponse::error(e.to_string())))
+        }
+    }
+}
+
+/// Enable an automation
+async fn enable_automation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.automations.enable(&id).await {
+        Ok(automation) => (StatusCode::OK, Json(ApiResponse::success(automation))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ApiResponse::error(e.to_string())))
+        }
+    }
+}
+
+/// Disable an automation
+async fn disable_automation(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    match state.automations.disable(&id).await {
+        Ok(automation) => (StatusCode::OK, Json(ApiResponse::success(automation))),
+        Err(e) => {
+            let status = if e.to_string().contains("not found") {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            (status, Json(ApiResponse::error(e.to_string())))
+        }
+    }
+}
+
 /// Serve the frontend
 async fn index() -> Html<&'static str> {
     Html(include_str!("../../../webapp/index.html"))
@@ -485,9 +670,29 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    // Initialize automation engine
+    let automations = match AutomationEngine::new(
+        network.clone(),
+        std::path::Path::new(&data_dir),
+    )
+    .await
+    {
+        Ok(engine) => {
+            let engine = Arc::new(engine);
+            engine.start();
+            tracing::info!("Automation engine started with {} automations", engine.list().len());
+            engine
+        }
+        Err(e) => {
+            tracing::error!("Failed to initialize automation engine: {}", e);
+            return Err(anyhow::anyhow!("Failed to initialize automation engine: {}", e));
+        }
+    };
+
     let state = AppState {
         network,
         cameras: Arc::new(cameras),
+        automations,
     };
 
     // Build the router
@@ -504,6 +709,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/network/aps-data", get(request_aps_data))
         .route("/api/v1/devices", get(list_devices))
         .route("/api/v1/devices/:ieee", get(get_device))
+        .route("/api/v1/devices/:ieee", axum::routing::put(update_device))
         .route("/api/v1/devices/:ieee/discover", post(discover_device))
         .route(
             "/api/v1/devices/:ieee/endpoints/:endpoint/toggle",
@@ -526,6 +732,15 @@ async fn main() -> anyhow::Result<()> {
             axum::routing::delete(camera::delete_camera),
         )
         .route("/api/v1/cameras/:id/stream", get(camera::stream_proxy))
+        // Automation routes
+        .route("/api/v1/automations", get(list_automations))
+        .route("/api/v1/automations", post(create_automation))
+        .route("/api/v1/automations/:id", get(get_automation))
+        .route("/api/v1/automations/:id", axum::routing::put(update_automation))
+        .route("/api/v1/automations/:id", axum::routing::delete(delete_automation))
+        .route("/api/v1/automations/:id/trigger", post(trigger_automation))
+        .route("/api/v1/automations/:id/enable", post(enable_automation))
+        .route("/api/v1/automations/:id/disable", post(disable_automation))
         // WebSocket
         .route("/ws", get(ws_handler))
         // Middleware
