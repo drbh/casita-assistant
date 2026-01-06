@@ -32,7 +32,8 @@ logs/
 
 # Node/webapp (if applicable)
 node_modules/
-dist/
+# Keep frontend/dist/ for pre-built webapp
+!/frontend/dist/
 .next/
 .nuxt/
 .output/
