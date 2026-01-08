@@ -2,38 +2,22 @@
   import { onMount } from 'svelte';
   import { ws, wsConnected } from './lib/websocket';
   import {
-    activeView,
     systemInfo,
     deviceCount,
     overallHealth,
     connectionStatus,
+    topPaneView,
+    bottomPaneView,
+    bottomPaneCollapsed,
     loadAll,
     loadDevices,
     loadCameras,
     loadAutomations,
     loadNetworkStatus,
+    updateDeviceState,
   } from './lib/stores/index';
   import type { ConnectionState } from './lib/stores/index';
-  import DevicesView from './components/DevicesView.svelte';
-  import AutomationsView from './components/AutomationsView.svelte';
-  import CamerasView from './components/CamerasView.svelte';
-  import StatusView from './components/StatusView.svelte';
-
-  const views = [
-    { id: 'devices', label: 'Devices' },
-    { id: 'automations', label: 'Automations' },
-    { id: 'cameras', label: 'Cameras' },
-    { id: 'status', label: 'Status' },
-  ] as const;
-
-  function switchView(view: typeof $activeView) {
-    $activeView = view;
-    // Refresh data when switching views
-    if (view === 'devices') loadDevices();
-    else if (view === 'automations') loadAutomations();
-    else if (view === 'cameras') loadCameras();
-    else if (view === 'status') loadNetworkStatus();
-  }
+  import Pane from './components/Pane.svelte';
 
   function getHealthClass(state: ConnectionState): string {
     switch (state) {
@@ -61,6 +45,11 @@
     ws.on('device_joined', () => loadDevices());
     ws.on('device_left', () => loadDevices());
     ws.on('device_updated', () => loadDevices());
+    ws.on('device_state_changed', (event: { ieee?: string; state_on?: boolean }) => {
+      if (event.ieee && event.state_on !== undefined) {
+        updateDeviceState(event.ieee, event.state_on);
+      }
+    });
     ws.on('network_state_changed', () => loadNetworkStatus());
     ws.on('automation_created', () => loadAutomations());
     ws.on('automation_updated', () => loadAutomations());
@@ -82,29 +71,10 @@
     </div>
   </header>
 
-  <nav class="nav">
-    {#each views as view}
-      <button
-        class="nav-btn"
-        class:active={$activeView === view.id}
-        onclick={() => switchView(view.id)}
-      >
-        {view.label}
-      </button>
-    {/each}
-  </nav>
-
-  <main class="main">
-    {#if $activeView === 'devices'}
-      <DevicesView />
-    {:else if $activeView === 'automations'}
-      <AutomationsView />
-    {:else if $activeView === 'cameras'}
-      <CamerasView />
-    {:else if $activeView === 'status'}
-      <StatusView />
-    {/if}
-  </main>
+  <div class="panes-container">
+    <Pane view={topPaneView} />
+    <Pane view={bottomPaneView} collapsible={true} collapsed={bottomPaneCollapsed} />
+  </div>
 
   <footer class="footer">
     <div class="footer-item">

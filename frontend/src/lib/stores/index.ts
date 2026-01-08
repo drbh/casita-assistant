@@ -5,6 +5,21 @@ import { api } from '../api';
 import type { Device, Camera, Automation, NetworkStatus, SystemInfo } from '../types';
 import { wsConnected } from '../websocket';
 
+// Helper for localStorage-backed stores
+function persistentWritable<T>(key: string, defaultValue: T) {
+  const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(key) : null;
+  const initial = stored !== null ? JSON.parse(stored) : defaultValue;
+  const store = writable<T>(initial);
+
+  store.subscribe(value => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  });
+
+  return store;
+}
+
 // Raw data stores
 export const devices = writable<Device[]>([]);
 export const cameras = writable<Camera[]>([]);
@@ -13,7 +28,11 @@ export const networkStatus = writable<NetworkStatus | null>(null);
 export const systemInfo = writable<SystemInfo | null>(null);
 
 // UI state
-export const activeView = writable<'devices' | 'automations' | 'cameras' | 'status'>('devices');
+export type ViewId = 'devices' | 'automations' | 'cameras' | 'status';
+export const activeView = writable<ViewId>('devices'); // deprecated, kept for compatibility
+export const topPaneView = persistentWritable<ViewId>('casita:topPaneView', 'devices');
+export const bottomPaneView = persistentWritable<ViewId>('casita:bottomPaneView', 'cameras');
+export const bottomPaneCollapsed = persistentWritable('casita:bottomPaneCollapsed', false);
 export const permitJoinActive = writable(false);
 export const permitJoinRemaining = writable(0);
 
@@ -99,6 +118,17 @@ export function formatIeee(bytes: number[]): string {
     return bytes.slice().reverse().map(b => b.toString(16).padStart(2, '0')).join(':');
   }
   return String(bytes);
+}
+
+// Update a single device's state (for WebSocket updates and optimistic UI)
+export function updateDeviceState(ieee: string, stateOn: boolean): void {
+  devices.update(list =>
+    list.map(d =>
+      formatIeee(d.ieee_address) === ieee
+        ? { ...d, state_on: stateOn }
+        : d
+    )
+  );
 }
 
 // Data loading functions

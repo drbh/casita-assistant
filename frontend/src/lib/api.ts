@@ -13,8 +13,9 @@ interface ApiResponse<T> {
 class ApiClient {
   private baseUrl: string;
 
-  constructor(baseUrl = '') {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl?: string) {
+    // Use VITE_API_URL env var, or empty string (current origin) as fallback
+    this.baseUrl = baseUrl ?? (import.meta.env.VITE_API_URL || '');
   }
 
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -99,6 +100,23 @@ class ApiClient {
     if (username) body.username = username;
     if (password) body.password = password;
     return this.request('POST', '/api/v1/cameras', body);
+  }
+
+  updateCamera(
+    id: string,
+    name?: string,
+    streamUrl?: string,
+    streamType?: string,
+    username?: string,
+    password?: string
+  ): Promise<Camera> {
+    const body: Record<string, unknown> = {};
+    if (name !== undefined) body.name = name;
+    if (streamUrl !== undefined) body.stream_url = streamUrl;
+    if (streamType !== undefined) body.stream_type = streamType;
+    if (username !== undefined) body.username = username;
+    if (password !== undefined) body.password = password;
+    return this.request('PUT', `/api/v1/cameras/${id}`, body);
   }
 
   deleteCamera(id: string): Promise<void> {

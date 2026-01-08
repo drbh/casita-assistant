@@ -57,6 +57,17 @@ fn default_stream_type() -> StreamType {
     StreamType::Mjpeg
 }
 
+/// Request to update a camera
+#[derive(Debug, Deserialize)]
+pub struct UpdateCameraRequest {
+    pub name: Option<String>,
+    pub stream_url: Option<String>,
+    pub stream_type: Option<StreamType>,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub enabled: Option<bool>,
+}
+
 /// Camera manager for storing and retrieving cameras
 pub struct CameraManager {
     cameras: Arc<DashMap<String, Camera>>,
@@ -124,6 +135,33 @@ impl CameraManager {
         self.cameras.get(id).map(|r| r.value().clone())
     }
 
+    /// Update a camera
+    pub fn update(&self, id: &str, req: UpdateCameraRequest) -> Option<Camera> {
+        let mut camera = self.cameras.get_mut(id)?;
+        if let Some(name) = req.name {
+            camera.name = name;
+        }
+        if let Some(stream_url) = req.stream_url {
+            camera.stream_url = stream_url;
+        }
+        if let Some(stream_type) = req.stream_type {
+            camera.stream_type = stream_type;
+        }
+        if let Some(username) = req.username {
+            camera.username = Some(username);
+        }
+        if let Some(password) = req.password {
+            camera.password = Some(password);
+        }
+        if let Some(enabled) = req.enabled {
+            camera.enabled = enabled;
+        }
+        let updated = camera.clone();
+        drop(camera);
+        let _ = self.save();
+        Some(updated)
+    }
+
     /// List all cameras
     pub fn list(&self) -> Vec<Camera> {
         self.cameras.iter().map(|r| r.value().clone()).collect()
@@ -170,6 +208,21 @@ pub async fn get_camera(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.cameras.get(&id) {
+        Some(camera) => (StatusCode::OK, Json(ApiResponse::success(camera))),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::error("Camera not found")),
+        ),
+    }
+}
+
+/// Update a camera
+pub async fn update_camera(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<UpdateCameraRequest>,
+) -> impl IntoResponse {
+    match state.cameras.update(&id, req) {
         Some(camera) => (StatusCode::OK, Json(ApiResponse::success(camera))),
         None => (
             StatusCode::NOT_FOUND,

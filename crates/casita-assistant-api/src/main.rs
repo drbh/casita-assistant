@@ -732,6 +732,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/v1/cameras/:id", get(camera::get_camera))
         .route(
             "/api/v1/cameras/:id",
+            axum::routing::put(camera::update_camera),
+        )
+        .route(
+            "/api/v1/cameras/:id",
             axum::routing::delete(camera::delete_camera),
         )
         .route("/api/v1/cameras/:id/stream", get(camera::stream_proxy))

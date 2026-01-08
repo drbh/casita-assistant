@@ -16,9 +16,15 @@ class WebSocketManager {
 
   constructor() {
     // Determine WebSocket URL based on environment
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.DEV ? 'localhost:3000' : window.location.host;
-    this.url = `${protocol}//${host}/ws`;
+    // Use VITE_API_URL if set, otherwise use current origin
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (apiUrl) {
+      // Convert http(s) URL to ws(s) URL
+      this.url = apiUrl.replace(/^http/, 'ws') + '/ws';
+    } else {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      this.url = `${protocol}//${window.location.host}/ws`;
+    }
   }
 
   connect(): void {

@@ -235,11 +235,19 @@
 </script>
 
 <div class="toolbar">
-  <button class="btn btn-primary" onclick={openLink}>Link Devices</button>
-  <button class="btn" onclick={openAdd}>Add Automation</button>
-  <button class="btn" onclick={() => loadAutomations()} disabled={$loading.automations}>Refresh</button>
+  <button class="btn btn-sm" onclick={openLink}>
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M4.715 6.542 3.343 7.914a3 3 0 1 0 4.243 4.243l1.828-1.829A3 3 0 0 0 8.586 5.5L8 6.086a1.002 1.002 0 0 0-.154.199 2 2 0 0 1 .861 3.337L6.88 11.45a2 2 0 1 1-2.83-2.83l.793-.792a4.018 4.018 0 0 1-.128-1.287z"/><path d="M6.586 4.672A3 3 0 0 0 7.414 9.5l.775-.776a2 2 0 0 1-.896-3.346L9.12 3.55a2 2 0 1 1 2.83 2.83l-.793.792c.112.42.155.855.128 1.287l1.372-1.372a3 3 0 1 0-4.243-4.243L6.586 4.672z"/></svg>
+    Link
+  </button>
+  <button class="btn btn-sm" onclick={openAdd}>
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+    Add
+  </button>
   <div class="toolbar-spacer"></div>
   <span class="text-sm muted">{$automations.length} rule(s)</span>
+  <button class="btn btn-sm" onclick={() => loadAutomations()} disabled={$loading.automations} title="Refresh">
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/><path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.9A5.002 5.002 0 0 0 8 3zM3.1 9a5.002 5.002 0 0 0 8.757 2.182.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.1z"/></svg>
+  </button>
 </div>
 
 {#if $automations.length === 0}
@@ -251,51 +259,47 @@
   <div class="automation-list">
     {#each $automations as automation (automation.id)}
       {@const interaction = getInteractionSummary(automation)}
-      <div class="automation-card" class:disabled-card={!automation.enabled}>
-        <div class="automation-header">
-          <div class="automation-name">
-            {#if interaction}
-              <span class="interaction-flow">
-                <span class="mono">{interaction.source}</span>
-                <span class="flow-arrow">→</span>
-                <span class="mono">{interaction.target}</span>
-              </span>
-              <span class="tag tag-blue">interaction</span>
-            {:else}
-              <span class="mono">{automation.name}</span>
-            {/if}
-            <span class="tag" class:tag-green={automation.enabled} class:tag-red={!automation.enabled}>
-              {automation.enabled ? 'ON' : 'OFF'}
+      <div class="automation-row" class:disabled-row={!automation.enabled}>
+        <span class="automation-name">
+          {#if interaction}
+            <span class="interaction-flow">
+              <span class="mono">{interaction.source}</span>
+              <span class="flow-arrow">→</span>
+              <span class="mono">{interaction.target}</span>
             </span>
-          </div>
-          <div class="automation-actions">
-            <button class="btn btn-sm" onclick={() => toggleEnabled(automation)}>
-              {automation.enabled ? 'Disable' : 'Enable'}
-            </button>
-            <button class="btn btn-sm btn-primary" onclick={() => runNow(automation.id)}>Run</button>
-            <button class="btn btn-sm" onclick={() => openEdit(automation)}>Edit</button>
-            <button class="btn btn-sm btn-danger" onclick={() => deleteAutomation(automation.id, automation.name)}>Del</button>
-          </div>
-        </div>
-        {#if interaction}
-          <div class="automation-desc text-sm muted">
-            When <strong>{interaction.trigger.replace('_', ' ')}</strong>, <strong>{interaction.action.replace('_', ' ')}</strong> target
-          </div>
-        {:else if automation.description}
-          <div class="automation-desc text-sm muted">{automation.description}</div>
-        {/if}
-        {#if !interaction}
-          <div class="automation-meta">
-            <span class="meta-item">
-              <span class="meta-label">Trigger:</span>
-              <span class="mono">{getTriggerText(automation.trigger)}</span>
-            </span>
-            <span class="meta-item">
-              <span class="meta-label">Actions:</span>
-              <span class="mono">{automation.actions.length}</span>
-            </span>
-          </div>
-        {/if}
+          {:else}
+            <span class="mono">{automation.name}</span>
+          {/if}
+        </span>
+        <span class="automation-tags">
+          <span class="tag" class:tag-green={automation.enabled} class:tag-red={!automation.enabled}>
+            {automation.enabled ? 'ON' : 'OFF'}
+          </span>
+          {#if interaction}
+            <span class="tag tag-blue">link</span>
+          {/if}
+        </span>
+        <span class="automation-trigger mono text-xs muted">
+          {#if interaction}
+            {interaction.trigger.replace('_', ' ')}
+          {:else}
+            {getTriggerText(automation.trigger)}
+          {/if}
+        </span>
+        <span class="automation-actions">
+          <button class="btn btn-sm" onclick={() => toggleEnabled(automation)} title={automation.enabled ? 'Disable' : 'Enable'}>
+            {automation.enabled ? 'Off' : 'On'}
+          </button>
+          <button class="btn btn-sm" onclick={() => runNow(automation.id)} title="Run now">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393z"/></svg>
+          </button>
+          <button class="btn btn-sm" onclick={() => openEdit(automation)} title="Edit">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.146a.5.5 0 0 1 .708 0l3 3a.5.5 0 0 1 0 .708l-10 10a.5.5 0 0 1-.168.11l-5 2a.5.5 0 0 1-.65-.65l2-5a.5.5 0 0 1 .11-.168l10-10zM11.207 2.5 13.5 4.793 14.793 3.5 12.5 1.207 11.207 2.5zm1.586 3L10.5 3.207 4 9.707V10h.5a.5.5 0 0 1 .5.5v.5h.5a.5.5 0 0 1 .5.5v.5h.293l6.5-6.5zm-9.761 5.175-.106.106-1.528 3.821 3.821-1.528.106-.106A.5.5 0 0 1 5 12.5V12h-.5a.5.5 0 0 1-.5-.5V11h-.5a.5.5 0 0 1-.468-.325z"/></svg>
+          </button>
+          <button class="btn btn-sm btn-danger" onclick={() => deleteAutomation(automation.id, automation.name)} title="Delete">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+          </button>
+        </span>
       </div>
     {/each}
   </div>
@@ -504,37 +508,62 @@
   .automation-list {
     display: flex;
     flex-direction: column;
-    gap: var(--space-sm);
-  }
-
-  .automation-card {
-    background: var(--bg-secondary);
+    gap: 1px;
+    background: var(--border-color);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: var(--space-md);
+    overflow: hidden;
   }
 
-  .automation-card:hover {
-    border-color: var(--border-light);
-  }
-
-  .disabled-card {
-    opacity: 0.5;
-  }
-
-  .automation-header {
+  .automation-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    gap: var(--space-md);
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
     flex-wrap: wrap;
   }
 
+  .automation-row:hover {
+    background: var(--bg-tertiary);
+  }
+
   .automation-name {
+    min-width: 80px;
+    font-size: var(--font-size-sm);
+    flex: 1;
+  }
+
+  .automation-tags {
     display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    font-weight: 500;
+    gap: var(--space-xs);
+  }
+
+  .automation-trigger {
+    display: none;
+  }
+
+  .automation-actions {
+    display: flex;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 600px) {
+    .automation-row {
+      flex-wrap: nowrap;
+      gap: var(--space-md);
+    }
+
+    .automation-name {
+      min-width: 140px;
+      flex: 0 0 auto;
+    }
+
+    .automation-trigger {
+      display: block;
+      flex: 1;
+    }
   }
 
   .interaction-flow {
@@ -548,36 +577,8 @@
     font-weight: bold;
   }
 
-  .automation-actions {
-    display: flex;
-    gap: var(--space-xs);
-    flex-wrap: wrap;
-  }
-
-  .automation-desc {
-    margin-top: var(--space-xs);
-  }
-
-  .automation-desc strong {
-    color: var(--text-primary);
-  }
-
-  .automation-meta {
-    display: flex;
-    gap: var(--space-lg);
-    margin-top: var(--space-sm);
-    padding-top: var(--space-sm);
-    border-top: 1px solid var(--border-color);
-    font-size: var(--font-size-sm);
-  }
-
-  .meta-item {
-    display: flex;
-    gap: var(--space-xs);
-  }
-
-  .meta-label {
-    color: var(--text-muted);
+  .disabled-row {
+    opacity: 0.5;
   }
 
   /* Link builder styles */
@@ -636,14 +637,6 @@
   }
 
   @media (max-width: 600px) {
-    .automation-header {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .automation-meta {
-      flex-direction: column;
-      gap: var(--space-xs);
-    }
     .link-row {
       flex-direction: column;
       align-items: stretch;
