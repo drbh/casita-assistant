@@ -145,7 +145,6 @@ mod tests {
 
     #[test]
     fn test_day_of_week_empty() {
-        let evaluator = ConditionEvaluator::new(None);
         assert!(ConditionEvaluator::evaluate_day_of_week(&[]));
     }
 }

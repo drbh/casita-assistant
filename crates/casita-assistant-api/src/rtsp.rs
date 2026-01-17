@@ -705,7 +705,6 @@ mod tests {
 
     #[test]
     fn test_fmp4_init_segment() {
-        let writer = Fmp4Writer::new();
         // Minimal avcC (AvcDecoderConfig) for testing
         // Format: configVersion(1) + profile(1) + compat(1) + level(1) + lengthSize(1) + numSPS(1) + spsLen(2) + sps + numPPS(1) + ppsLen(2) + pps
         let avcc = vec![

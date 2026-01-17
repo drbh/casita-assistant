@@ -21,9 +21,9 @@ its recommended to setup a `/etc/systemd/system/casita-assistant.service` file t
 
 ## Motivation
 
-Casita Assistant is a minimalistic home automation tool that I built for my own use.  
+Casita Assistant is a minimalistic home automation tool that I built for my own use.
 
-The core motivator was that I have nm orange pi 5 RV2 that I wanted to use as a home automation server, but getting Home Assistant to run natively was a nightmare. HA installed many dependencies I did not need/want like AI frameworks and complex integration systems. 
+The core motivator was that I have nm orange pi 5 RV2 that I wanted to use as a home automation server, but getting Home Assistant to run natively was a nightmare. HA installed many dependencies I did not need/want like AI frameworks and complex integration systems.
 
 So I just thought i'd roll my own smaller home automation server that does all of the things I need and I can slowly add more features as my system grows.
 
