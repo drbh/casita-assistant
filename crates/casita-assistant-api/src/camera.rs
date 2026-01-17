@@ -1,8 +1,13 @@
 //! Camera management and streaming support
+//!
+//! Supports multiple stream types:
+//! - MJPEG: Direct HTTP proxy (most compatible)
+//! - RTSP/H.264: Native handling via retina crate, served as fMP4 for browser MSE
+//! - WebRTC: Planned for lowest latency (not yet implemented)
 
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, StatusCode},
     response::IntoResponse,
     Json,
@@ -11,17 +16,29 @@ use dashmap::DashMap;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::Arc};
+use tokio::sync::broadcast;
 use uuid::Uuid;
 
+use crate::rtsp::{build_rtsp_url, Fmp4Writer, RtspClient};
 use crate::{ApiResponse, AppState};
 
 /// Camera stream type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamType {
+    /// MJPEG stream (HTTP proxy, most compatible)
     Mjpeg,
+    /// RTSP H.264 stream (native retina client, served as fMP4 for MSE)
     Rtsp,
+    /// WebRTC stream (planned, not yet implemented)
     WebRtc,
+}
+
+/// Query parameters for stream endpoint
+#[derive(Debug, Deserialize)]
+pub struct StreamQuery {
+    /// Output format: "fmp4" (default for H.264), "mjpeg" (fallback)
+    pub format: Option<String>,
 }
 
 /// Camera configuration
@@ -245,10 +262,17 @@ pub async fn delete_camera(
     }
 }
 
-/// Proxy stream from camera (MJPEG direct or RTSP via FFmpeg)
+/// Proxy stream from camera
+///
+/// For MJPEG cameras: Direct HTTP proxy
+/// For RTSP cameras: Native handling via retina, served as fMP4 for browser MSE
+///
+/// Query parameters:
+/// - format: "fmp4" (default for RTSP), "mjpeg"
 pub async fn stream_proxy(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    Query(query): Query<StreamQuery>,
 ) -> impl IntoResponse {
     // Look up camera
     let camera = match state.cameras.get(&id) {
@@ -266,9 +290,24 @@ pub async fn stream_proxy(
             .into_response();
     }
 
+    let format = query.format.as_deref().unwrap_or("auto");
+
     match camera.stream_type {
         StreamType::Mjpeg => stream_mjpeg(&camera).await,
-        StreamType::Rtsp => stream_rtsp(&camera).await,
+        StreamType::Rtsp => {
+            // For RTSP, default to fMP4 for efficient H.264 passthrough
+            match format {
+                "mjpeg" => {
+                    // Fallback to MJPEG via transcoding (not recommended)
+                    (
+                        StatusCode::NOT_IMPLEMENTED,
+                        "MJPEG transcoding from RTSP is no longer supported. Use fMP4 format.".to_string(),
+                    )
+                        .into_response()
+                }
+                _ => stream_rtsp_fmp4(&camera).await,
+            }
+        }
         StreamType::WebRtc => (
             StatusCode::NOT_IMPLEMENTED,
             "WebRTC streams are not yet supported via this endpoint".to_string(),
@@ -326,114 +365,110 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
     (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response()
 }
 
-/// Stream RTSP via FFmpeg transcoding to MJPEG
-async fn stream_rtsp(camera: &Camera) -> axum::response::Response {
-    use crate::rtsp::RtspTranscoder;
-    use tokio::io::AsyncReadExt;
-
+/// Stream RTSP via native retina client as fMP4 (fragmented MP4)
+///
+/// This is much more efficient than FFmpeg transcoding because:
+/// 1. No external process needed (pure Rust)
+/// 2. No transcoding - H.264 is passed through directly
+/// 3. Browser can decode H.264 natively via MSE (Media Source Extensions)
+async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
     // Build RTSP URL with credentials
-    let rtsp_url = RtspTranscoder::build_rtsp_url(
+    let rtsp_url = match build_rtsp_url(
         &camera.stream_url,
         camera.username.as_deref(),
         camera.password.as_deref(),
+    ) {
+        Ok(url) => url,
+        Err(e) => {
+            tracing::error!("Invalid RTSP URL: {}", e);
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Invalid RTSP URL: {}", e),
+            )
+                .into_response();
+        }
+    };
+
+    tracing::info!(
+        "Starting native RTSP stream for camera {} (fMP4 output)",
+        camera.name
     );
 
-    tracing::info!("Starting RTSP stream via FFmpeg for camera {}", camera.name);
+    let camera_name = camera.name.clone();
 
-    // Clone URL for the stream closure
-    let rtsp_url_clone = rtsp_url.clone();
-
-    // Parse JPEG frames from FFmpeg output and wrap with multipart boundaries
-    // The transcoder must be created inside the stream to keep it alive
+    // Create the fMP4 stream
     let stream = async_stream::stream! {
-        // Create and start transcoder inside the stream
-        let mut transcoder = RtspTranscoder::new();
-        let stdout = match transcoder.start(&rtsp_url_clone).await {
-            Ok(stdout) => stdout,
+        // Connect to RTSP stream using retina
+        let client = RtspClient::new(rtsp_url);
+
+        let (params, mut rx) = match client.connect().await {
+            Ok(result) => result,
             Err(e) => {
-                tracing::error!("Failed to start FFmpeg: {}", e);
+                tracing::error!("Failed to connect to RTSP stream: {}", e);
                 return;
             }
         };
 
-        let mut reader = tokio::io::BufReader::with_capacity(64 * 1024, stdout);
-        let mut buffer = Vec::with_capacity(512 * 1024);
-        let mut chunk = [0u8; 32 * 1024]; // Read 32KB at a time
-        let boundary = "frame";
+        tracing::info!("Connected to RTSP stream for camera {}", camera_name);
+
+        // Initialize fMP4 writer
+        let mut writer = Fmp4Writer::new();
+
+        // Default SPS/PPS for H.264 baseline profile (will be updated from stream)
+        let default_sps = vec![0x67, 0x64, 0x00, 0x1f, 0xac, 0xd9, 0x40, 0x50, 0x05, 0xbb, 0x01, 0x10, 0x00, 0x00, 0x03, 0x00, 0x10, 0x00, 0x00, 0x03, 0x03, 0xc0, 0xf1, 0x83, 0x18, 0x46];
+        let default_pps = vec![0x68, 0xeb, 0xe3, 0xcb, 0x22, 0xc0];
+
+        // Send initialization segment
+        let init_segment = writer.write_init_segment(
+            params.width,
+            params.height,
+            if params.sps.is_empty() { &default_sps } else { &params.sps },
+            if params.pps.is_empty() { &default_pps } else { &params.pps },
+        );
+        yield Ok::<_, std::io::Error>(init_segment);
+
+        // Stream frames as fMP4 segments
+        let mut frame_count = 0u64;
+        let frame_duration = 3000u32; // ~33ms at 90kHz for 30fps
 
         loop {
-            // Read a chunk of data
-            match reader.read(&mut chunk).await {
-                Ok(0) => break, // EOF
-                Ok(n) => buffer.extend_from_slice(&chunk[..n]),
-                Err(e) => {
-                    tracing::warn!("FFmpeg read error: {}", e);
+            match rx.recv().await {
+                Ok(frame) => {
+                    // Only start streaming from keyframe for clean playback
+                    if frame_count == 0 && !frame.is_keyframe {
+                        continue;
+                    }
+
+                    let segment = writer.write_media_segment(
+                        &frame.data,
+                        frame.is_keyframe,
+                        frame_duration,
+                    );
+                    yield Ok(segment);
+
+                    frame_count += 1;
+
+                    // Log periodically
+                    if frame_count % 300 == 0 {
+                        tracing::debug!("Streamed {} frames for camera {}", frame_count, camera_name);
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!("Dropped {} frames due to slow consumer", n);
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    tracing::info!("RTSP stream closed for camera {}", camera_name);
                     break;
                 }
             }
-
-            // Scan buffer for complete JPEG frames (FFD8...FFD9)
-            loop {
-                // Find JPEG start marker (FFD8)
-                let start = buffer.iter().position(|&b| b == 0xFF)
-                    .and_then(|i| {
-                        if i + 1 < buffer.len() && buffer[i + 1] == 0xD8 {
-                            Some(i)
-                        } else {
-                            None
-                        }
-                    });
-
-                let start_idx = match start {
-                    Some(idx) => idx,
-                    None => break, // No JPEG start found
-                };
-
-                // Find JPEG end marker (FFD9) after start
-                let end = buffer[start_idx..].windows(2)
-                    .position(|w| w[0] == 0xFF && w[1] == 0xD9)
-                    .map(|i| start_idx + i + 2);
-
-                let end_idx = match end {
-                    Some(idx) => idx,
-                    None => break, // No complete frame yet
-                };
-
-                // Extract the complete JPEG frame
-                let frame = &buffer[start_idx..end_idx];
-
-                // Emit with multipart boundary
-                let header = format!(
-                    "--{}\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
-                    boundary,
-                    frame.len()
-                );
-                yield Ok::<_, std::io::Error>(bytes::Bytes::from(header.into_bytes()));
-                yield Ok(bytes::Bytes::copy_from_slice(frame));
-                yield Ok(bytes::Bytes::from_static(b"\r\n"));
-
-                // Remove processed data from buffer
-                buffer.drain(..end_idx);
-            }
-
-            // Safety: limit buffer size
-            if buffer.len() > 2 * 1024 * 1024 {
-                buffer.clear();
-            }
         }
-
-        // Transcoder will be dropped here when stream ends
-        drop(transcoder);
     };
 
     let body = Body::from_stream(stream);
 
     (
         StatusCode::OK,
-        [(
-            header::CONTENT_TYPE,
-            format!("multipart/x-mixed-replace; boundary=frame"),
-        )],
+        [(header::CONTENT_TYPE, "video/mp4".to_string())],
         body,
     )
         .into_response()

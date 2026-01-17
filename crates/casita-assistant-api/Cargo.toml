@@ -25,6 +25,10 @@ bytes = "1"
 rust-embed = { version = "8", features = ["compression"] }
 mime_guess = "2"
 
+# Native RTSP support (replaces ffmpeg dependency)
+retina = "0.4"
+url = "2"
+
 [features]
 default = ["embed-frontend"]
 embed-frontend = []
