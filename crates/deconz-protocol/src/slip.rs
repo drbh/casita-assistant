@@ -6,9 +6,9 @@
 pub const SLIP_END: u8 = 0xC0;
 /// SLIP ESC byte - escape character
 pub const SLIP_ESC: u8 = 0xDB;
-/// SLIP ESC_END - escaped form of END
+/// SLIP `ESC_END` - escaped form of END
 pub const SLIP_ESC_END: u8 = 0xDC;
-/// SLIP ESC_ESC - escaped form of ESC
+/// SLIP `ESC_ESC` - escaped form of ESC
 pub const SLIP_ESC_ESC: u8 = 0xDD;
 
 /// SLIP encoder for outgoing frames
@@ -19,7 +19,7 @@ impl SlipEncoder {
     ///
     /// Prefixes and suffixes with END byte (Phil Karn's improvement)
     /// to flush any line noise before the actual frame.
-    pub fn encode(data: &[u8]) -> Vec<u8> {
+    #[must_use] pub fn encode(data: &[u8]) -> Vec<u8> {
         let mut encoded = Vec::with_capacity(data.len() * 2 + 2);
         encoded.push(SLIP_END); // Start with END to flush noise
 
@@ -56,7 +56,7 @@ impl Default for SlipDecoder {
 
 impl SlipDecoder {
     /// Create a new SLIP decoder
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Self {
             buffer: Vec::with_capacity(256),
             in_escape: false,

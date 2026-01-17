@@ -120,17 +120,17 @@ impl AutomationEngine {
     }
 
     /// Subscribe to automation events
-    pub fn subscribe(&self) -> broadcast::Receiver<AutomationEvent> {
+    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<AutomationEvent> {
         self.event_tx.subscribe()
     }
 
     /// Get all automations
-    pub fn list(&self) -> Vec<Automation> {
+    #[must_use] pub fn list(&self) -> Vec<Automation> {
         self.automations.iter().map(|r| r.value().clone()).collect()
     }
 
     /// Get automation by ID
-    pub fn get(&self, id: &str) -> Option<Automation> {
+    #[must_use] pub fn get(&self, id: &str) -> Option<Automation> {
         self.automations.get(id).map(|r| r.value().clone())
     }
 
@@ -421,17 +421,4 @@ fn format_ieee(ieee: &[u8; 8]) -> String {
         .map(|b| format!("{b:02x}"))
         .collect::<Vec<_>>()
         .join(":")
-}
-
-impl Default for UpdateAutomationRequest {
-    fn default() -> Self {
-        Self {
-            name: None,
-            description: None,
-            enabled: None,
-            trigger: None,
-            conditions: None,
-            actions: None,
-        }
-    }
 }

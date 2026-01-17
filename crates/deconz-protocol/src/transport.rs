@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
 
-/// Default baud rate for ConBee II
+/// Default baud rate for `ConBee` II
 pub const BAUD_RATE: u32 = 115200;
 
 /// Default request timeout
@@ -125,7 +125,7 @@ impl DeconzTransport {
                 WriteCommand::Send(data) => {
                     tracing::debug!("Writing {} bytes to serial port", data.len());
                     match port.write_all(&data) {
-                        Ok(_) => tracing::debug!("Write successful"),
+                        Ok(()) => tracing::debug!("Write successful"),
                         Err(e) => tracing::error!("Write error: {}", e),
                     }
                     if let Err(e) = port.flush() {
@@ -363,7 +363,7 @@ impl DeconzTransport {
         if version_data.len() >= 2 {
             let protocol_version = u16::from_le_bytes([version_data[0], version_data[1]]);
             // Create a pseudo firmware version from protocol version
-            Ok(FirmwareVersion::from_u32(protocol_version as u32))
+            Ok(FirmwareVersion::from_u32(u32::from(protocol_version)))
         } else {
             Err(ProtocolError::InvalidFrame(
                 "Protocol version response too short".to_string(),

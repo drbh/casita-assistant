@@ -13,7 +13,7 @@ pub struct ConditionEvaluator {
 
 impl ConditionEvaluator {
     /// Create a new condition evaluator
-    pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
+    #[must_use] pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
         Self { network }
     }
 
@@ -98,8 +98,7 @@ impl ConditionEvaluator {
         let ieee = parse_ieee_address(device_ieee)?;
         let is_available = network
             .get_device(&ieee)
-            .map(|d| d.available)
-            .unwrap_or(false);
+            .is_some_and(|d| d.available);
 
         Ok(is_available == should_be_available)
     }
@@ -117,7 +116,7 @@ fn parse_ieee_address(s: &str) -> Result<[u8; 8], AutomationError> {
         .split(':')
         .map(|part| u8::from_str_radix(part, 16))
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| AutomationError::InvalidAction(format!("Invalid IEEE address: {}", s)))?;
+        .map_err(|_| AutomationError::InvalidAction(format!("Invalid IEEE address: {s}")))?;
 
     if bytes.len() != 8 {
         return Err(AutomationError::InvalidAction(format!(

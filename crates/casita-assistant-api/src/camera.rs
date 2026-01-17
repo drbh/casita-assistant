@@ -182,7 +182,7 @@ pub async fn add_camera(
     };
 
     match state.cameras.add(camera.clone()) {
-        Ok(_) => (StatusCode::CREATED, Json(ApiResponse::success(camera))),
+        Ok(()) => (StatusCode::CREATED, Json(ApiResponse::success(camera))),
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(ApiResponse::error(e.to_string())),
@@ -294,7 +294,7 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
             tracing::error!("Failed to connect to camera: {}", e);
             return (
                 StatusCode::BAD_GATEWAY,
-                format!("Failed to connect to camera: {}", e),
+                format!("Failed to connect to camera: {e}"),
             )
                 .into_response();
         }
@@ -315,9 +315,9 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
         .unwrap_or("multipart/x-mixed-replace; boundary=frame")
         .to_string();
 
-    let stream = response.bytes_stream().map(|result| {
-        result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-    });
+    let stream = response
+        .bytes_stream()
+        .map(|result| result.map_err(|e| std::io::Error::other(e.to_string())));
 
     let body = Body::from_stream(stream);
 
@@ -330,7 +330,7 @@ async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
         Ok(url) => url,
         Err(e) => {
             tracing::error!("Invalid RTSP URL: {}", e);
-            return (StatusCode::BAD_REQUEST, format!("Invalid RTSP URL: {}", e)).into_response();
+            return (StatusCode::BAD_REQUEST, format!("Invalid RTSP URL: {e}")).into_response();
         }
     };
 

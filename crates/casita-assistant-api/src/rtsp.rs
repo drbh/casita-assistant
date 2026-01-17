@@ -8,7 +8,7 @@ use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct H264Parameters {
-    /// AvcDecoderConfig (avcC box contents) - contains SPS/PPS
+    /// `AvcDecoderConfig` (avcC box contents) - contains SPS/PPS
     pub avcc: Bytes,
     pub width: u32,
     pub height: u32,
@@ -65,7 +65,7 @@ impl RtspClient {
                 )
                 .await
                 {
-                    Ok(_) => {
+                    Ok(()) => {
                         tracing::info!("RTSP stream ended normally");
                         break;
                     }
@@ -188,29 +188,20 @@ impl RtspClient {
                             sent_initial_params = true;
                             initial_params.take()
                         } else if frame.has_new_parameters() {
-                            // Get updated parameters from the stream
-                            if let Some(stream) = session.streams().get(video_stream_idx) {
-                                if let Some(params) = stream.parameters() {
-                                    if let retina::codec::ParametersRef::Video(video_params) =
-                                        params
-                                    {
-                                        let extra_data = video_params.extra_data();
-                                        let (width, height) = video_params.pixel_dimensions();
-                                        tracing::info!(
-                                            "Got updated video parameters: {}x{}, extra_data len={}",
-                                            width, height, extra_data.len()
-                                        );
-                                        Some(H264Parameters {
-                                            avcc: Bytes::copy_from_slice(extra_data),
-                                            width,
-                                            height,
-                                        })
-                                    } else {
-                                        None
-                                    }
-                                } else {
-                                    None
-                                }
+                            if let Some(retina::codec::ParametersRef::Video(video_params)) =
+                                session.streams().get(video_stream_idx).and_then(retina::client::Stream::parameters)
+                            {
+                                let extra_data = video_params.extra_data();
+                                let (width, height) = video_params.pixel_dimensions();
+                                tracing::info!(
+                                    "Got updated video parameters: {}x{}, extra_data len={}",
+                                    width, height, extra_data.len()
+                                );
+                                Some(H264Parameters {
+                                    avcc: Bytes::copy_from_slice(extra_data),
+                                    width,
+                                    height,
+                                })
                             } else {
                                 None
                             }
@@ -305,7 +296,7 @@ impl Fmp4Writer {
         Self::write_mdat(&mut buf, frame_data);
 
         self.sequence_number += 1;
-        self.base_decode_time += duration as u64;
+        self.base_decode_time += u64::from(duration);
 
         buf.freeze()
     }

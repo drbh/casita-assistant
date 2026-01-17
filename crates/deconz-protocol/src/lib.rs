@@ -1,7 +1,7 @@
-//! deCONZ Serial Protocol implementation for ConBee II
+//! deCONZ Serial Protocol implementation for `ConBee` II
 //!
 //! This crate implements the serial protocol used to communicate with
-//! Dresden Elektronik ConBee II Zigbee coordinators.
+//! Dresden Elektronik `ConBee` II Zigbee coordinators.
 
 pub mod commands;
 pub mod frame;

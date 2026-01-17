@@ -35,13 +35,13 @@ pub struct ActionExecutor {
 
 impl ActionExecutor {
     /// Create a new action executor
-    pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
+    #[must_use] pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
         let (event_tx, _) = broadcast::channel(64);
         Self { network, event_tx }
     }
 
     /// Subscribe to executor events
-    pub fn subscribe(&self) -> broadcast::Receiver<ExecutorEvent> {
+    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<ExecutorEvent> {
         self.event_tx.subscribe()
     }
 
@@ -148,7 +148,7 @@ fn parse_ieee_address(s: &str) -> Result<[u8; 8], AutomationError> {
         .split(':')
         .map(|part| u8::from_str_radix(part, 16))
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| AutomationError::InvalidAction(format!("Invalid IEEE address: {}", s)))?;
+        .map_err(|_| AutomationError::InvalidAction(format!("Invalid IEEE address: {s}")))?;
 
     if bytes.len() != 8 {
         return Err(AutomationError::InvalidAction(format!(

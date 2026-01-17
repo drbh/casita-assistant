@@ -3,7 +3,7 @@
 use crate::commands::CommandId;
 use crate::types::ProtocolError;
 
-/// Minimum frame size: cmd(1) + seq(1) + status(1) + frame_len(2) + crc(2) = 7
+/// Minimum frame size: cmd(1) + seq(1) + status(1) + `frame_len(2)` + crc(2) = 7
 pub const MIN_FRAME_SIZE: usize = 7;
 
 /// deCONZ protocol frame
@@ -27,7 +27,7 @@ pub struct Frame {
 
 impl Frame {
     /// Create a new frame (for requests, status=0)
-    pub fn new(command_id: CommandId, sequence: u8, payload: Vec<u8>) -> Self {
+    #[must_use] pub fn new(command_id: CommandId, sequence: u8, payload: Vec<u8>) -> Self {
         Self {
             command_id,
             sequence,
@@ -37,7 +37,7 @@ impl Frame {
     }
 
     /// Serialize frame to bytes (ready for SLIP encoding)
-    pub fn serialize(&self) -> Vec<u8> {
+    #[must_use] pub fn serialize(&self) -> Vec<u8> {
         // frame_len = cmd(1) + seq(1) + status(1) + frame_len(2) + payload
         // Note: frame_len does NOT include the CRC bytes
         let frame_len = (5 + self.payload.len()) as u16;
@@ -112,8 +112,8 @@ impl Frame {
     }
 
     /// Calculate 16-bit CRC (two's complement of sum)
-    pub fn calculate_crc(data: &[u8]) -> u16 {
-        let sum: u16 = data.iter().map(|&b| b as u16).sum();
+    #[must_use] pub fn calculate_crc(data: &[u8]) -> u16 {
+        let sum: u16 = data.iter().map(|&b| u16::from(b)).sum();
         (!sum).wrapping_add(1)
     }
 }
@@ -128,7 +128,7 @@ mod tests {
         let crc = Frame::calculate_crc(&data);
 
         // Verify CRC by checking the calculated value
-        let sum: u16 = data.iter().map(|&b| b as u16).sum();
+        let sum: u16 = data.iter().map(|&b| u16::from(b)).sum();
         let expected_crc = (!sum).wrapping_add(1);
         assert_eq!(crc, expected_crc);
     }

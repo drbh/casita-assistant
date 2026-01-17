@@ -34,7 +34,7 @@ pub struct AppState {
     pub automations: Arc<AutomationEngine>,
 }
 
-/// API response wrapper using serde_json::Value for flexibility
+/// API response wrapper using `serde_json::Value` for flexibility
 #[derive(Serialize)]
 struct ApiResponse {
     success: bool,
@@ -127,7 +127,7 @@ async fn permit_join(
         );
     };
     match network.permit_join(req.duration).await {
-        Ok(_) => (
+        Ok(()) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
                 "duration": req.duration
@@ -160,7 +160,7 @@ async fn get_device(State(state): State<AppState>, Path(ieee): Path<String>) -> 
     // Parse IEEE address from hex string
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(()) => {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::error("Invalid IEEE address format")),
@@ -190,7 +190,7 @@ async fn discover_device(
     };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(()) => {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::error("Invalid IEEE address format")),
@@ -199,7 +199,7 @@ async fn discover_device(
     };
 
     match network.discover_endpoints(&ieee_bytes).await {
-        Ok(_) => (
+        Ok(()) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
                 "status": "discovery_started",
@@ -236,7 +236,7 @@ async fn update_device(
     };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(()) => {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::error("Invalid IEEE address format")),
@@ -358,7 +358,7 @@ async fn toggle_device(
     };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(()) => {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::error("Invalid IEEE address format")),
@@ -367,7 +367,7 @@ async fn toggle_device(
     };
 
     match network.toggle_device(&ieee_bytes, endpoint).await {
-        Ok(_) => (
+        Ok(()) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
                 "action": "toggle",
@@ -395,7 +395,7 @@ async fn device_on(
     };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(()) => {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::error("Invalid IEEE address format")),
@@ -404,7 +404,7 @@ async fn device_on(
     };
 
     match network.turn_on(&ieee_bytes, endpoint).await {
-        Ok(_) => (
+        Ok(()) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
                 "action": "on",
@@ -432,7 +432,7 @@ async fn device_off(
     };
     let ieee_bytes = match parse_ieee_address(&ieee) {
         Ok(bytes) => bytes,
-        Err(_) => {
+        Err(()) => {
             return (
                 StatusCode::BAD_REQUEST,
                 Json(ApiResponse::error("Invalid IEEE address format")),
@@ -441,7 +441,7 @@ async fn device_off(
     };
 
     match network.turn_off(&ieee_bytes, endpoint).await {
-        Ok(_) => (
+        Ok(()) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
                 "action": "off",
@@ -542,7 +542,7 @@ async fn trigger_automation(
     Path(id): Path<String>,
 ) -> impl IntoResponse {
     match state.automations.trigger(&id).await {
-        Ok(_) => (
+        Ok(()) => (
             StatusCode::OK,
             Json(ApiResponse::success(serde_json::json!({
                 "status": "triggered",
@@ -691,8 +691,7 @@ async fn main() -> anyhow::Result<()> {
             Err(e) => {
                 tracing::error!("Failed to initialize automation engine: {}", e);
                 return Err(anyhow::anyhow!(
-                    "Failed to initialize automation engine: {}",
-                    e
+                    "Failed to initialize automation engine: {e}"
                 ));
             }
         };

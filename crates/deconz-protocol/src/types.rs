@@ -73,7 +73,7 @@ pub struct DeviceState {
 }
 
 impl DeviceState {
-    pub fn from_byte(byte: u8) -> Self {
+    #[must_use] pub fn from_byte(byte: u8) -> Self {
         Self {
             network_state: NetworkState::from_bits(byte & 0x03),
             aps_data_confirm: (byte & 0x04) != 0,
@@ -94,7 +94,7 @@ pub enum NetworkState {
 }
 
 impl NetworkState {
-    pub fn from_bits(bits: u8) -> Self {
+    #[must_use] pub fn from_bits(bits: u8) -> Self {
         match bits & 0x03 {
             0 => NetworkState::Offline,
             1 => NetworkState::Joining,
@@ -137,7 +137,7 @@ pub struct FirmwareVersion {
 }
 
 impl FirmwareVersion {
-    pub fn from_u32(version: u32) -> Self {
+    #[must_use] pub fn from_u32(version: u32) -> Self {
         Self {
             major: ((version >> 24) & 0xFF) as u8,
             minor: ((version >> 16) & 0xFF) as u8,
@@ -194,7 +194,7 @@ pub enum ZdoCluster {
     ActiveEpRsp = 0x8005,
 }
 
-/// APS Data Indication - parsed incoming ZigBee message
+/// APS Data Indication - parsed incoming `ZigBee` message
 #[derive(Debug, Clone)]
 pub struct ApsDataIndication {
     pub device_state: DeviceState,
@@ -327,7 +327,7 @@ impl ApsDataIndication {
     }
 
     /// Format IEEE address as string (colon-separated hex)
-    pub fn format_ieee(ieee: &[u8; 8]) -> String {
+    #[must_use] pub fn format_ieee(ieee: &[u8; 8]) -> String {
         // IEEE is stored little-endian, display big-endian
         format!(
             "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
@@ -367,17 +367,17 @@ impl DeviceAnnouncement {
     }
 
     /// Check if device is a router (FFD)
-    pub fn is_router(&self) -> bool {
+    #[must_use] pub fn is_router(&self) -> bool {
         (self.capability & 0x02) != 0
     }
 
     /// Check if device is mains powered
-    pub fn is_mains_powered(&self) -> bool {
+    #[must_use] pub fn is_mains_powered(&self) -> bool {
         (self.capability & 0x04) != 0
     }
 
     /// Check if receiver is on when idle
-    pub fn rx_on_when_idle(&self) -> bool {
+    #[must_use] pub fn rx_on_when_idle(&self) -> bool {
         (self.capability & 0x08) != 0
     }
 }
@@ -565,7 +565,7 @@ pub struct ApsDataRequest {
 
 impl ApsDataRequest {
     /// Create a new APS data request
-    pub fn new(
+    #[must_use] pub fn new(
         request_id: u8,
         dest_short_addr: u16,
         dest_endpoint: u8,
@@ -587,7 +587,7 @@ impl ApsDataRequest {
     }
 
     /// Create a ZDO Active Endpoints Request
-    pub fn active_endpoints_request(request_id: u8, dest_short_addr: u16, tsn: u8) -> Self {
+    #[must_use] pub fn active_endpoints_request(request_id: u8, dest_short_addr: u16, tsn: u8) -> Self {
         // ASDU: TSN (1 byte) + NWK address of interest (2 bytes LE)
         let mut asdu = vec![tsn];
         asdu.extend_from_slice(&dest_short_addr.to_le_bytes());
@@ -607,7 +607,7 @@ impl ApsDataRequest {
     }
 
     /// Create a ZDO Simple Descriptor Request
-    pub fn simple_descriptor_request(
+    #[must_use] pub fn simple_descriptor_request(
         request_id: u8,
         dest_short_addr: u16,
         endpoint: u8,
@@ -633,7 +633,7 @@ impl ApsDataRequest {
     }
 
     /// Serialize to bytes for sending
-    pub fn serialize(&self) -> Vec<u8> {
+    #[must_use] pub fn serialize(&self) -> Vec<u8> {
         let mut data = Vec::new();
 
         // Payload length (will be filled at the end)
@@ -737,32 +737,32 @@ impl ZclFrame {
     }
 
     /// Get frame control byte
-    pub fn frame_control(&self) -> u8 {
+    #[must_use] pub fn frame_control(&self) -> u8 {
         self.frame_control
     }
 
     /// Check if this is a cluster-specific command (vs global)
-    pub fn is_cluster_specific(&self) -> bool {
+    #[must_use] pub fn is_cluster_specific(&self) -> bool {
         (self.frame_control & 0x03) == 0x01
     }
 
     /// Check if this is from server to client (vs client to server)
-    pub fn is_from_server(&self) -> bool {
+    #[must_use] pub fn is_from_server(&self) -> bool {
         (self.frame_control & 0x08) != 0
     }
 
     /// Get the command ID
-    pub fn command_id(&self) -> u8 {
+    #[must_use] pub fn command_id(&self) -> u8 {
         self.command_id
     }
 
     /// Get the payload
-    pub fn payload(&self) -> &[u8] {
+    #[must_use] pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 
     /// Create a cluster-specific command frame (client to server)
-    pub fn cluster_command(transaction_seq: u8, command_id: u8) -> Self {
+    #[must_use] pub fn cluster_command(transaction_seq: u8, command_id: u8) -> Self {
         Self {
             frame_control: 0x01, // Cluster-specific, client-to-server, disable default response
             manufacturer_code: None,
@@ -773,12 +773,12 @@ impl ZclFrame {
     }
 
     /// Create an On/Off cluster command
-    pub fn on_off_command(transaction_seq: u8, cmd: OnOffCommand) -> Self {
+    #[must_use] pub fn on_off_command(transaction_seq: u8, cmd: OnOffCommand) -> Self {
         Self::cluster_command(transaction_seq, cmd as u8)
     }
 
     /// Serialize to bytes
-    pub fn serialize(&self) -> Vec<u8> {
+    #[must_use] pub fn serialize(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(self.frame_control);
         if let Some(mfr) = self.manufacturer_code {

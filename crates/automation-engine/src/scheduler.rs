@@ -32,7 +32,7 @@ impl Default for Scheduler {
 
 impl Scheduler {
     /// Create a new scheduler
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         let (event_tx, _) = broadcast::channel(64);
         Self {
             timers: Arc::new(DashMap::new()),
@@ -41,7 +41,7 @@ impl Scheduler {
     }
 
     /// Subscribe to scheduler events
-    pub fn subscribe(&self) -> broadcast::Receiver<SchedulerEvent> {
+    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<SchedulerEvent> {
         self.event_tx.subscribe()
     }
 
@@ -197,7 +197,7 @@ impl Scheduler {
     /// Schedule a cron-based trigger
     fn schedule_cron(&self, automation_id: &str, expression: &str) -> Result<(), AutomationError> {
         let schedule = Schedule::from_str(expression)
-            .map_err(|e| AutomationError::InvalidCron(format!("{}: {}", expression, e)))?;
+            .map_err(|e| AutomationError::InvalidCron(format!("{expression}: {e}")))?;
 
         let id = automation_id.to_string();
         let event_tx = self.event_tx.clone();
@@ -246,7 +246,7 @@ impl Scheduler {
     }
 
     /// Get the number of active timers
-    pub fn active_count(&self) -> usize {
+    #[must_use] pub fn active_count(&self) -> usize {
         self.timers.len()
     }
 }

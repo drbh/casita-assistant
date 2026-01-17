@@ -250,8 +250,7 @@ impl ZigbeeNetwork {
                                                 // Toggle: get current state and flip it
                                                 devices
                                                     .get(&ieee_address)
-                                                    .map(|d| !d.state_on.unwrap_or(false))
-                                                    .unwrap_or(true)
+                                                    .is_none_or(|d| !d.state_on.unwrap_or(false))
                                             }
                                         };
 
@@ -399,12 +398,12 @@ impl ZigbeeNetwork {
     }
 
     /// Get the underlying transport
-    pub fn transport(&self) -> &DeconzTransport {
+    #[must_use] pub fn transport(&self) -> &DeconzTransport {
         &self.transport
     }
 
     /// Subscribe to network events
-    pub fn subscribe(&self) -> broadcast::Receiver<NetworkEvent> {
+    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<NetworkEvent> {
         self.event_tx.subscribe()
     }
 
@@ -486,12 +485,12 @@ impl ZigbeeNetwork {
     }
 
     /// Get all known devices
-    pub fn get_devices(&self) -> Vec<ZigbeeDevice> {
+    #[must_use] pub fn get_devices(&self) -> Vec<ZigbeeDevice> {
         self.devices.iter().map(|r| r.value().clone()).collect()
     }
 
     /// Get a specific device by IEEE address
-    pub fn get_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
+    #[must_use] pub fn get_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
         self.devices.get(ieee).map(|r| r.value().clone())
     }
 
@@ -513,7 +512,7 @@ impl ZigbeeNetwork {
     }
 
     /// Remove a device
-    pub fn remove_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
+    #[must_use] pub fn remove_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
         let removed = self.devices.remove(ieee).map(|(_, v)| v);
         if removed.is_some() {
             let _ = self.event_tx.send(NetworkEvent::DeviceLeft {

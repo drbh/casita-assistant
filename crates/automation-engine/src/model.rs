@@ -203,7 +203,7 @@ fn default_enabled() -> bool {
 }
 
 /// Request to update an automation
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct UpdateAutomationRequest {
     #[serde(default)]
     pub name: Option<String>,
@@ -221,7 +221,7 @@ pub struct UpdateAutomationRequest {
 
 impl Automation {
     /// Create a new automation from a create request
-    pub fn from_request(request: CreateAutomationRequest) -> Self {
+    #[must_use] pub fn from_request(request: CreateAutomationRequest) -> Self {
         let now = chrono::Utc::now().to_rfc3339();
         Self {
             id: uuid::Uuid::new_v4().to_string(),

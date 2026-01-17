@@ -33,7 +33,7 @@ pub enum CommandId {
 }
 
 impl CommandId {
-    pub fn from_u8(value: u8) -> Option<Self> {
+    #[must_use] pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x04 => Some(CommandId::ApsDataConfirm),
             0x07 => Some(CommandId::DeviceState),
@@ -94,7 +94,7 @@ pub enum NetworkParameter {
 }
 
 impl NetworkParameter {
-    pub fn from_u8(value: u8) -> Option<Self> {
+    #[must_use] pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x01 => Some(NetworkParameter::MacAddress),
             0x05 => Some(NetworkParameter::NwkPanId),
@@ -118,7 +118,7 @@ impl NetworkParameter {
     }
 
     /// Get the expected length of the parameter value
-    pub fn value_length(&self) -> usize {
+    #[must_use] pub fn value_length(&self) -> usize {
         match self {
             NetworkParameter::MacAddress => 8,
             NetworkParameter::NwkPanId => 2,
