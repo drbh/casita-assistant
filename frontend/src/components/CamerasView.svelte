@@ -2,6 +2,7 @@
   import { cameras, loading, loadCameras } from '../lib/stores/index';
   import { api } from '../lib/api';
   import type { Camera } from '../lib/types';
+  import VideoPlayer from './VideoPlayer.svelte';
 
   let showModal = $state(false);
   let editingId = $state<string | null>(null);
@@ -116,11 +117,11 @@
       </div>
       {#if isPlaying}
         <div class="camera-stream-row">
-          {#if camera.stream_type === 'webrtc'}
-            <div class="stream-placeholder">WebRTC not supported in UI</div>
-          {:else}
-            <img src={getStreamUrl(camera.id)} alt={camera.name} class="stream-img">
-          {/if}
+          <VideoPlayer
+            streamUrl={getStreamUrl(camera.id)}
+            streamType={camera.stream_type}
+            name={camera.name}
+          />
         </div>
       {/if}
     {/each}
@@ -153,7 +154,7 @@
             placeholder={streamType === 'rtsp' ? 'rtsp://192.168.1.x:554/stream' : 'http://192.168.1.x:8000/video_feed'}
             required>
           {#if streamType === 'rtsp'}
-            <div class="form-hint">Format: rtsp://host:554/path</div>
+            <div class="form-hint">H.264 streams are efficiently served as fMP4 (no transcoding)</div>
           {/if}
         </div>
         {#if streamType === 'rtsp'}
@@ -237,14 +238,4 @@
     overflow: hidden;
   }
 
-  .stream-img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  .stream-placeholder {
-    color: var(--text-muted);
-    font-size: var(--font-size-sm);
-  }
 </style>

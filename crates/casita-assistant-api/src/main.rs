@@ -610,8 +610,9 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "casita_assistant_api=debug,deconz_protocol=debug,info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "casita_assistant_api=debug,deconz_protocol=debug,retina=error,info".into()
+            }),
         )
         .init();
 
