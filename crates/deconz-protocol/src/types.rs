@@ -64,6 +64,7 @@ impl TryFrom<u8> for Status {
 
 /// Device state flags
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_excessive_bools)] // Maps to protocol bit flags
 pub struct DeviceState {
     pub network_state: NetworkState,
     pub aps_data_confirm: bool,
@@ -73,7 +74,8 @@ pub struct DeviceState {
 }
 
 impl DeviceState {
-    #[must_use] pub fn from_byte(byte: u8) -> Self {
+    #[must_use]
+    pub fn from_byte(byte: u8) -> Self {
         Self {
             network_state: NetworkState::from_bits(byte & 0x03),
             aps_data_confirm: (byte & 0x04) != 0,
@@ -94,7 +96,8 @@ pub enum NetworkState {
 }
 
 impl NetworkState {
-    #[must_use] pub fn from_bits(bits: u8) -> Self {
+    #[must_use]
+    pub fn from_bits(bits: u8) -> Self {
         match bits & 0x03 {
             0 => NetworkState::Offline,
             1 => NetworkState::Joining,
@@ -137,7 +140,8 @@ pub struct FirmwareVersion {
 }
 
 impl FirmwareVersion {
-    #[must_use] pub fn from_u32(version: u32) -> Self {
+    #[must_use]
+    pub fn from_u32(version: u32) -> Self {
         Self {
             major: ((version >> 24) & 0xFF) as u8,
             minor: ((version >> 16) & 0xFF) as u8,
@@ -214,6 +218,7 @@ pub struct ApsDataIndication {
 
 impl ApsDataIndication {
     /// Parse APS Data Indication from raw payload
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(data: &[u8]) -> Result<Self, ProtocolError> {
         if data.len() < 15 {
             return Err(ProtocolError::FrameTooShort(data.len()));
@@ -303,6 +308,7 @@ impl ApsDataIndication {
 
         // LQI and RSSI (may not be present in all firmware versions)
         let lqi = if idx < data.len() { data[idx] } else { 0 };
+        #[allow(clippy::cast_possible_wrap)] // RSSI is signed dBm encoded as u8
         let rssi = if idx + 1 < data.len() {
             data[idx + 1] as i8
         } else {
@@ -327,7 +333,8 @@ impl ApsDataIndication {
     }
 
     /// Format IEEE address as string (colon-separated hex)
-    #[must_use] pub fn format_ieee(ieee: &[u8; 8]) -> String {
+    #[must_use]
+    pub fn format_ieee(ieee: &[u8; 8]) -> String {
         // IEEE is stored little-endian, display big-endian
         format!(
             "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
@@ -347,6 +354,7 @@ pub struct DeviceAnnouncement {
 
 impl DeviceAnnouncement {
     /// Parse device announcement from ASDU
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(asdu: &[u8]) -> Result<Self, ProtocolError> {
         if asdu.len() < 12 {
             return Err(ProtocolError::FrameTooShort(asdu.len()));
@@ -367,17 +375,20 @@ impl DeviceAnnouncement {
     }
 
     /// Check if device is a router (FFD)
-    #[must_use] pub fn is_router(&self) -> bool {
+    #[must_use]
+    pub fn is_router(&self) -> bool {
         (self.capability & 0x02) != 0
     }
 
     /// Check if device is mains powered
-    #[must_use] pub fn is_mains_powered(&self) -> bool {
+    #[must_use]
+    pub fn is_mains_powered(&self) -> bool {
         (self.capability & 0x04) != 0
     }
 
     /// Check if receiver is on when idle
-    #[must_use] pub fn rx_on_when_idle(&self) -> bool {
+    #[must_use]
+    pub fn rx_on_when_idle(&self) -> bool {
         (self.capability & 0x08) != 0
     }
 }
@@ -393,6 +404,7 @@ pub struct ActiveEndpointsResponse {
 
 impl ActiveEndpointsResponse {
     /// Parse from ASDU
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(asdu: &[u8]) -> Result<Self, ProtocolError> {
         if asdu.len() < 4 {
             return Err(ProtocolError::FrameTooShort(asdu.len()));
@@ -438,6 +450,7 @@ pub struct SimpleDescriptorResponse {
 
 impl SimpleDescriptorResponse {
     /// Parse from ASDU
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(asdu: &[u8]) -> Result<Self, ProtocolError> {
         if asdu.len() < 5 {
             return Err(ProtocolError::FrameTooShort(asdu.len()));
@@ -461,7 +474,6 @@ impl SimpleDescriptorResponse {
             });
         }
 
-        let _desc_len = asdu[4];
         let mut idx = 5;
 
         if asdu.len() < idx + 6 {
@@ -565,7 +577,8 @@ pub struct ApsDataRequest {
 
 impl ApsDataRequest {
     /// Create a new APS data request
-    #[must_use] pub fn new(
+    #[must_use]
+    pub fn new(
         request_id: u8,
         dest_short_addr: u16,
         dest_endpoint: u8,
@@ -587,7 +600,8 @@ impl ApsDataRequest {
     }
 
     /// Create a ZDO Active Endpoints Request
-    #[must_use] pub fn active_endpoints_request(request_id: u8, dest_short_addr: u16, tsn: u8) -> Self {
+    #[must_use]
+    pub fn active_endpoints_request(request_id: u8, dest_short_addr: u16, tsn: u8) -> Self {
         // ASDU: TSN (1 byte) + NWK address of interest (2 bytes LE)
         let mut asdu = vec![tsn];
         asdu.extend_from_slice(&dest_short_addr.to_le_bytes());
@@ -607,7 +621,8 @@ impl ApsDataRequest {
     }
 
     /// Create a ZDO Simple Descriptor Request
-    #[must_use] pub fn simple_descriptor_request(
+    #[must_use]
+    pub fn simple_descriptor_request(
         request_id: u8,
         dest_short_addr: u16,
         endpoint: u8,
@@ -633,7 +648,9 @@ impl ApsDataRequest {
     }
 
     /// Serialize to bytes for sending
-    #[must_use] pub fn serialize(&self) -> Vec<u8> {
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)] // Panic only on protocol-violating payload size
+    pub fn serialize(&self) -> Vec<u8> {
         let mut data = Vec::new();
 
         // Payload length (will be filled at the end)
@@ -665,7 +682,8 @@ impl ApsDataRequest {
         data.push(self.src_endpoint);
 
         // ASDU length
-        data.extend_from_slice(&(self.asdu.len() as u16).to_le_bytes());
+        let asdu_len = u16::try_from(self.asdu.len()).expect("ASDU exceeds protocol maximum");
+        data.extend_from_slice(&asdu_len.to_le_bytes());
 
         // ASDU (ZCL frame)
         data.extend_from_slice(&self.asdu);
@@ -677,7 +695,7 @@ impl ApsDataRequest {
         data.push(self.radius);
 
         // Fill in payload length (everything after the 2-byte length field)
-        let payload_len = (data.len() - 2) as u16;
+        let payload_len = u16::try_from(data.len() - 2).expect("payload exceeds protocol maximum");
         data[payload_start..payload_start + 2].copy_from_slice(&payload_len.to_le_bytes());
 
         data
@@ -696,6 +714,7 @@ pub struct ZclFrame {
 
 impl ZclFrame {
     /// Parse a ZCL frame from raw ASDU bytes
+    #[allow(clippy::missing_errors_doc)]
     pub fn parse(data: &[u8]) -> Result<Self, ProtocolError> {
         if data.len() < 3 {
             return Err(ProtocolError::FrameTooShort(data.len()));
@@ -737,32 +756,38 @@ impl ZclFrame {
     }
 
     /// Get frame control byte
-    #[must_use] pub fn frame_control(&self) -> u8 {
+    #[must_use]
+    pub fn frame_control(&self) -> u8 {
         self.frame_control
     }
 
     /// Check if this is a cluster-specific command (vs global)
-    #[must_use] pub fn is_cluster_specific(&self) -> bool {
+    #[must_use]
+    pub fn is_cluster_specific(&self) -> bool {
         (self.frame_control & 0x03) == 0x01
     }
 
     /// Check if this is from server to client (vs client to server)
-    #[must_use] pub fn is_from_server(&self) -> bool {
+    #[must_use]
+    pub fn is_from_server(&self) -> bool {
         (self.frame_control & 0x08) != 0
     }
 
     /// Get the command ID
-    #[must_use] pub fn command_id(&self) -> u8 {
+    #[must_use]
+    pub fn command_id(&self) -> u8 {
         self.command_id
     }
 
     /// Get the payload
-    #[must_use] pub fn payload(&self) -> &[u8] {
+    #[must_use]
+    pub fn payload(&self) -> &[u8] {
         &self.payload
     }
 
     /// Create a cluster-specific command frame (client to server)
-    #[must_use] pub fn cluster_command(transaction_seq: u8, command_id: u8) -> Self {
+    #[must_use]
+    pub fn cluster_command(transaction_seq: u8, command_id: u8) -> Self {
         Self {
             frame_control: 0x01, // Cluster-specific, client-to-server, disable default response
             manufacturer_code: None,
@@ -773,12 +798,14 @@ impl ZclFrame {
     }
 
     /// Create an On/Off cluster command
-    #[must_use] pub fn on_off_command(transaction_seq: u8, cmd: OnOffCommand) -> Self {
+    #[must_use]
+    pub fn on_off_command(transaction_seq: u8, cmd: OnOffCommand) -> Self {
         Self::cluster_command(transaction_seq, cmd as u8)
     }
 
     /// Serialize to bytes
-    #[must_use] pub fn serialize(&self) -> Vec<u8> {
+    #[must_use]
+    pub fn serialize(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(self.frame_control);
         if let Some(mfr) = self.manufacturer_code {

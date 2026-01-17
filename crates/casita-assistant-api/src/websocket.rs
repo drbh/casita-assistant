@@ -53,7 +53,7 @@ pub enum WsEvent {
     },
 }
 
-/// Handle a WebSocket connection
+#[allow(clippy::too_many_lines)] // WebSocket handler manages multiple event sources
 pub async fn handle_socket(socket: WebSocket, state: AppState) {
     let (sender, mut receiver) = socket.split();
 
@@ -80,12 +80,12 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
                             }
                             zigbee_core::network::NetworkEvent::DeviceLeft { ieee_address } => {
                                 WsEvent::DeviceLeft {
-                                    ieee_address: format_ieee(&ieee_address),
+                                    ieee_address: format_ieee(ieee_address),
                                 }
                             }
                             zigbee_core::network::NetworkEvent::DeviceUpdated { ieee_address } => {
                                 WsEvent::DeviceUpdated {
-                                    ieee_address: format_ieee(&ieee_address),
+                                    ieee_address: format_ieee(ieee_address),
                                 }
                             }
                             zigbee_core::network::NetworkEvent::NetworkStateChanged {
@@ -96,7 +96,7 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
                                 endpoint,
                                 state_on,
                             } => WsEvent::DeviceStateChanged {
-                                ieee_address: format_ieee(&ieee_address),
+                                ieee_address: format_ieee(ieee_address),
                                 endpoint,
                                 state_on,
                             },
@@ -106,7 +106,7 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
                             break;
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
@@ -159,7 +159,7 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
                         break;
                     }
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                 Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
@@ -184,8 +184,7 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
             Ok(Message::Text(_text)) => {
                 // Handle client commands here if needed
             }
-            Ok(Message::Close(_)) => break,
-            Err(_) => break,
+            Ok(Message::Close(_)) | Err(_) => break,
             _ => {}
         }
     }
@@ -198,7 +197,7 @@ pub async fn handle_socket(socket: WebSocket, state: AppState) {
     send_task.abort();
 }
 
-fn format_ieee(ieee: &[u8; 8]) -> String {
+fn format_ieee(ieee: [u8; 8]) -> String {
     ieee.iter()
         .rev()
         .map(|b| format!("{b:02x}"))

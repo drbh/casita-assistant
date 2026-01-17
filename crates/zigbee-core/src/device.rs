@@ -67,7 +67,8 @@ pub struct ZigbeeDevice {
 
 impl ZigbeeDevice {
     /// Create a new device with just address info
-    #[must_use] pub fn new(ieee_address: [u8; 8], nwk_address: u16) -> Self {
+    #[must_use]
+    pub fn new(ieee_address: [u8; 8], nwk_address: u16) -> Self {
         Self {
             ieee_address,
             nwk_address,
@@ -85,7 +86,8 @@ impl ZigbeeDevice {
     }
 
     /// Get IEEE address as hex string
-    #[must_use] pub fn ieee_address_string(&self) -> String {
+    #[must_use]
+    pub fn ieee_address_string(&self) -> String {
         self.ieee_address
             .iter()
             .rev() // IEEE addresses are typically displayed in reverse byte order
@@ -95,7 +97,8 @@ impl ZigbeeDevice {
     }
 
     /// Get a display name (friendly name, model, or IEEE address)
-    #[must_use] pub fn display_name(&self) -> String {
+    #[must_use]
+    pub fn display_name(&self) -> String {
         self.friendly_name
             .clone()
             .or_else(|| self.model.clone())
@@ -120,33 +123,39 @@ pub struct Endpoint {
 
 impl Endpoint {
     /// Check if endpoint has a specific cluster
-    #[must_use] pub fn has_cluster(&self, cluster_id: u16) -> bool {
+    #[must_use]
+    pub fn has_cluster(&self, cluster_id: u16) -> bool {
         self.in_clusters.contains(&cluster_id) || self.out_clusters.contains(&cluster_id)
     }
 
     /// Check if this is a light endpoint
-    #[must_use] pub fn is_light(&self) -> bool {
+    #[must_use]
+    pub fn is_light(&self) -> bool {
         // Check for On/Off cluster (0x0006) or Level Control (0x0008)
         self.has_cluster(0x0006) || self.has_cluster(0x0008)
     }
 
     /// Check if this is a color light endpoint
-    #[must_use] pub fn is_color_light(&self) -> bool {
+    #[must_use]
+    pub fn is_color_light(&self) -> bool {
         self.has_cluster(0x0300) // Color Control cluster
     }
 
     /// Check if this has temperature sensor
-    #[must_use] pub fn has_temperature(&self) -> bool {
+    #[must_use]
+    pub fn has_temperature(&self) -> bool {
         self.has_cluster(0x0402)
     }
 
     /// Check if this has humidity sensor
-    #[must_use] pub fn has_humidity(&self) -> bool {
+    #[must_use]
+    pub fn has_humidity(&self) -> bool {
         self.has_cluster(0x0405)
     }
 
     /// Check if this is an occupancy sensor
-    #[must_use] pub fn is_occupancy_sensor(&self) -> bool {
+    #[must_use]
+    pub fn is_occupancy_sensor(&self) -> bool {
         self.has_cluster(0x0406)
     }
 }

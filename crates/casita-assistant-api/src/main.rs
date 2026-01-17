@@ -158,14 +158,11 @@ async fn get_device(State(state): State<AppState>, Path(ieee): Path<String>) -> 
         );
     };
     // Parse IEEE address from hex string
-    let ieee_bytes = match parse_ieee_address(&ieee) {
-        Ok(bytes) => bytes,
-        Err(()) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error("Invalid IEEE address format")),
-            )
-        }
+    let Ok(ieee_bytes) = parse_ieee_address(&ieee) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error("Invalid IEEE address format")),
+        );
     };
 
     match network.get_device(&ieee_bytes) {
@@ -188,14 +185,11 @@ async fn discover_device(
             Json(ApiResponse::error("Zigbee network not available")),
         );
     };
-    let ieee_bytes = match parse_ieee_address(&ieee) {
-        Ok(bytes) => bytes,
-        Err(()) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error("Invalid IEEE address format")),
-            )
-        }
+    let Ok(ieee_bytes) = parse_ieee_address(&ieee) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error("Invalid IEEE address format")),
+        );
     };
 
     match network.discover_endpoints(&ieee_bytes).await {
@@ -234,14 +228,11 @@ async fn update_device(
             Json(ApiResponse::error("Zigbee network not available")),
         );
     };
-    let ieee_bytes = match parse_ieee_address(&ieee) {
-        Ok(bytes) => bytes,
-        Err(()) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error("Invalid IEEE address format")),
-            )
-        }
+    let Ok(ieee_bytes) = parse_ieee_address(&ieee) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error("Invalid IEEE address format")),
+        );
     };
 
     match network.update_device_metadata(&ieee_bytes, request.friendly_name, request.category) {
@@ -356,14 +347,11 @@ async fn toggle_device(
             Json(ApiResponse::error("Zigbee network not available")),
         );
     };
-    let ieee_bytes = match parse_ieee_address(&ieee) {
-        Ok(bytes) => bytes,
-        Err(()) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error("Invalid IEEE address format")),
-            )
-        }
+    let Ok(ieee_bytes) = parse_ieee_address(&ieee) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error("Invalid IEEE address format")),
+        );
     };
 
     match network.toggle_device(&ieee_bytes, endpoint).await {
@@ -393,14 +381,11 @@ async fn device_on(
             Json(ApiResponse::error("Zigbee network not available")),
         );
     };
-    let ieee_bytes = match parse_ieee_address(&ieee) {
-        Ok(bytes) => bytes,
-        Err(()) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error("Invalid IEEE address format")),
-            )
-        }
+    let Ok(ieee_bytes) = parse_ieee_address(&ieee) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error("Invalid IEEE address format")),
+        );
     };
 
     match network.turn_on(&ieee_bytes, endpoint).await {
@@ -430,14 +415,11 @@ async fn device_off(
             Json(ApiResponse::error("Zigbee network not available")),
         );
     };
-    let ieee_bytes = match parse_ieee_address(&ieee) {
-        Ok(bytes) => bytes,
-        Err(()) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                Json(ApiResponse::error("Invalid IEEE address format")),
-            )
-        }
+    let Ok(ieee_bytes) = parse_ieee_address(&ieee) else {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(ApiResponse::error("Invalid IEEE address format")),
+        );
     };
 
     match network.turn_off(&ieee_bytes, endpoint).await {
@@ -605,6 +587,7 @@ async fn index() -> Html<&'static str> {
 }
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)] // Application setup and routing configuration
 async fn main() -> anyhow::Result<()> {
     // Initialize tracing
     tracing_subscriber::registry()

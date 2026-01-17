@@ -29,6 +29,7 @@ pub async fn load_automations(path: &Path) -> Vec<Automation> {
 }
 
 /// Save automations to a JSON file atomically
+#[allow(clippy::missing_errors_doc)]
 pub async fn save_automations(
     path: &Path,
     automations: &[Automation],

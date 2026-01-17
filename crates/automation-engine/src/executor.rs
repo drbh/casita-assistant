@@ -35,17 +35,20 @@ pub struct ActionExecutor {
 
 impl ActionExecutor {
     /// Create a new action executor
-    #[must_use] pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
+    #[must_use]
+    pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
         let (event_tx, _) = broadcast::channel(64);
         Self { network, event_tx }
     }
 
     /// Subscribe to executor events
-    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<ExecutorEvent> {
+    #[must_use]
+    pub fn subscribe(&self) -> broadcast::Receiver<ExecutorEvent> {
         self.event_tx.subscribe()
     }
 
     /// Execute a list of actions for an automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn execute_actions(
         &self,
         automation_id: &str,
@@ -103,7 +106,7 @@ impl ActionExecutor {
                 Ok(())
             }
             Action::Log { message, level } => {
-                self.execute_log(message, level);
+                Self::execute_log(message, level);
                 Ok(())
             }
         }
@@ -131,8 +134,7 @@ impl ActionExecutor {
         result.map_err(|e| AutomationError::DeviceControlFailed(e.to_string()))
     }
 
-    /// Execute a log action
-    fn execute_log(&self, message: &str, level: &LogLevel) {
+    fn execute_log(message: &str, level: &LogLevel) {
         match level {
             LogLevel::Debug => tracing::debug!(target: "automation", "{}", message),
             LogLevel::Info => tracing::info!(target: "automation", "{}", message),

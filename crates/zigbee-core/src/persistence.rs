@@ -29,6 +29,7 @@ pub async fn load_devices(path: &Path) -> Vec<ZigbeeDevice> {
 }
 
 /// Save devices to a JSON file atomically
+#[allow(clippy::missing_errors_doc)]
 pub async fn save_devices(path: &Path, devices: &[ZigbeeDevice]) -> Result<(), std::io::Error> {
     // Ensure parent directory exists
     if let Some(parent) = path.parent() {

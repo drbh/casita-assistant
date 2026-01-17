@@ -32,7 +32,8 @@ impl Default for Scheduler {
 
 impl Scheduler {
     /// Create a new scheduler
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         let (event_tx, _) = broadcast::channel(64);
         Self {
             timers: Arc::new(DashMap::new()),
@@ -41,16 +42,16 @@ impl Scheduler {
     }
 
     /// Subscribe to scheduler events
-    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<SchedulerEvent> {
+    #[must_use]
+    pub fn subscribe(&self) -> broadcast::Receiver<SchedulerEvent> {
         self.event_tx.subscribe()
     }
 
     /// Register an automation with a schedule trigger
+    #[allow(clippy::missing_errors_doc)]
     pub fn register(&self, automation: &Automation) -> Result<(), AutomationError> {
-        // Only handle schedule triggers
-        let schedule = match &automation.trigger {
-            Trigger::Schedule { schedule } => schedule,
-            _ => return Ok(()), // Not a schedule trigger, nothing to do
+        let Trigger::Schedule { schedule } = &automation.trigger else {
+            return Ok(());
         };
 
         if !automation.enabled {
@@ -87,6 +88,7 @@ impl Scheduler {
     }
 
     /// Update an automation's schedule
+    #[allow(clippy::missing_errors_doc)]
     pub fn update(&self, automation: &Automation) -> Result<(), AutomationError> {
         // Re-register (which handles removal and recreation)
         self.register(automation)
@@ -150,7 +152,8 @@ impl Scheduler {
                 if !days_filter.is_empty() {
                     let mut dt = target_datetime;
                     let mut attempts = 0;
-                    while !days_filter.contains(&(dt.weekday().num_days_from_sunday() as u8))
+                    while !days_filter
+                        .contains(&u8::try_from(dt.weekday().num_days_from_sunday()).unwrap())
                         && attempts < 7
                     {
                         dt += chrono::Duration::days(1);
@@ -246,7 +249,8 @@ impl Scheduler {
     }
 
     /// Get the number of active timers
-    #[must_use] pub fn active_count(&self) -> usize {
+    #[must_use]
+    pub fn active_count(&self) -> usize {
         self.timers.len()
     }
 }

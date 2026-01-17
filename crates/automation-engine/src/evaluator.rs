@@ -13,11 +13,13 @@ pub struct ConditionEvaluator {
 
 impl ConditionEvaluator {
     /// Create a new condition evaluator
-    #[must_use] pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
+    #[must_use]
+    pub fn new(network: Option<Arc<ZigbeeNetwork>>) -> Self {
         Self { network }
     }
 
     /// Evaluate all conditions (all must pass for AND semantics)
+    #[allow(clippy::missing_errors_doc)]
     pub fn evaluate_all(&self, conditions: &[Condition]) -> Result<bool, AutomationError> {
         for condition in conditions {
             if !self.evaluate(condition)? {
@@ -28,10 +30,11 @@ impl ConditionEvaluator {
     }
 
     /// Evaluate a single condition
+    #[allow(clippy::missing_errors_doc)]
     pub fn evaluate(&self, condition: &Condition) -> Result<bool, AutomationError> {
         match condition {
-            Condition::TimeRange { start, end } => self.evaluate_time_range(start, end),
-            Condition::DayOfWeek { days } => self.evaluate_day_of_week(days),
+            Condition::TimeRange { start, end } => Self::evaluate_time_range(start, end),
+            Condition::DayOfWeek { days } => Ok(Self::evaluate_day_of_week(days)),
             Condition::DeviceAvailable {
                 device_ieee,
                 available,
@@ -56,8 +59,7 @@ impl ConditionEvaluator {
         }
     }
 
-    /// Evaluate time range condition
-    fn evaluate_time_range(&self, start: &str, end: &str) -> Result<bool, AutomationError> {
+    fn evaluate_time_range(start: &str, end: &str) -> Result<bool, AutomationError> {
         let start_time = parse_time(start)?;
         let end_time = parse_time(end)?;
         let now = Local::now().time();
@@ -74,14 +76,14 @@ impl ConditionEvaluator {
         Ok(in_range)
     }
 
-    /// Evaluate day of week condition
-    fn evaluate_day_of_week(&self, days: &[u8]) -> Result<bool, AutomationError> {
+    fn evaluate_day_of_week(days: &[u8]) -> bool {
         if days.is_empty() {
-            return Ok(true); // Empty means every day
+            return true; // Empty means every day
         }
 
-        let today = Local::now().weekday().num_days_from_sunday() as u8;
-        Ok(days.contains(&today))
+        let today =
+            u8::try_from(Local::now().weekday().num_days_from_sunday()).expect("weekday is 0-6");
+        days.contains(&today)
     }
 
     /// Evaluate device availability condition
@@ -96,9 +98,7 @@ impl ConditionEvaluator {
         };
 
         let ieee = parse_ieee_address(device_ieee)?;
-        let is_available = network
-            .get_device(&ieee)
-            .is_some_and(|d| d.available);
+        let is_available = network.get_device(&ieee).is_some_and(|d| d.available);
 
         Ok(is_available == should_be_available)
     }
@@ -146,6 +146,6 @@ mod tests {
     #[test]
     fn test_day_of_week_empty() {
         let evaluator = ConditionEvaluator::new(None);
-        assert!(evaluator.evaluate_day_of_week(&[]).unwrap());
+        assert!(ConditionEvaluator::evaluate_day_of_week(&[]));
     }
 }

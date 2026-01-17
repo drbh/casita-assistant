@@ -19,7 +19,8 @@ impl SlipEncoder {
     ///
     /// Prefixes and suffixes with END byte (Phil Karn's improvement)
     /// to flush any line noise before the actual frame.
-    #[must_use] pub fn encode(data: &[u8]) -> Vec<u8> {
+    #[must_use]
+    pub fn encode(data: &[u8]) -> Vec<u8> {
         let mut encoded = Vec::with_capacity(data.len() * 2 + 2);
         encoded.push(SLIP_END); // Start with END to flush noise
 
@@ -56,7 +57,8 @@ impl Default for SlipDecoder {
 
 impl SlipDecoder {
     /// Create a new SLIP decoder
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             buffer: Vec::with_capacity(256),
             in_escape: false,
@@ -179,7 +181,7 @@ mod tests {
         let original = vec![0x01, SLIP_END, 0x02, SLIP_ESC, 0x03, 0x00, 0xFF];
         let encoded = SlipEncoder::encode(&original);
         let mut decoder = SlipDecoder::new();
-        let decoded = decoder.feed(&encoded);
-        assert_eq!(decoded, vec![original]);
+        let frames = decoder.feed(&encoded);
+        assert_eq!(frames, vec![original]);
     }
 }

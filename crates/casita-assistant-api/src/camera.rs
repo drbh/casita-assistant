@@ -237,12 +237,8 @@ pub async fn stream_proxy(
     Path(id): Path<String>,
     Query(query): Query<StreamQuery>,
 ) -> impl IntoResponse {
-    // Look up camera
-    let camera = match state.cameras.get(&id) {
-        Some(c) => c,
-        None => {
-            return (StatusCode::NOT_FOUND, "Camera not found".to_string()).into_response();
-        }
+    let Some(camera) = state.cameras.get(&id) else {
+        return (StatusCode::NOT_FOUND, "Camera not found".to_string()).into_response();
     };
 
     if !camera.enabled {
@@ -269,7 +265,7 @@ pub async fn stream_proxy(
                     )
                         .into_response()
                 }
-                _ => stream_rtsp_fmp4(&camera).await,
+                _ => stream_rtsp_fmp4(&camera),
             }
         }
         StreamType::WebRtc => (
@@ -324,7 +320,7 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
     (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response()
 }
 
-async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
+fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
     // Parse RTSP URL (without credentials - retina doesn't support embedded credentials)
     let rtsp_url = match url::Url::parse(&camera.stream_url) {
         Ok(url) => url,
@@ -367,7 +363,7 @@ async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
                     // Wait for parameters before sending init segment
                     if !init_sent {
                         if let Some(params) = &frame.new_parameters {
-                            let init_segment = writer.write_init_segment(
+                            let init_segment = Fmp4Writer::write_init_segment(
                                 params.width,
                                 params.height,
                                 &params.avcc,

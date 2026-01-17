@@ -60,6 +60,7 @@ pub struct AutomationEngine {
 
 impl AutomationEngine {
     /// Create a new automation engine
+    #[allow(clippy::missing_errors_doc)]
     pub async fn new(
         network: Option<Arc<ZigbeeNetwork>>,
         data_dir: &std::path::Path,
@@ -120,21 +121,25 @@ impl AutomationEngine {
     }
 
     /// Subscribe to automation events
-    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<AutomationEvent> {
+    #[must_use]
+    pub fn subscribe(&self) -> broadcast::Receiver<AutomationEvent> {
         self.event_tx.subscribe()
     }
 
     /// Get all automations
-    #[must_use] pub fn list(&self) -> Vec<Automation> {
+    #[must_use]
+    pub fn list(&self) -> Vec<Automation> {
         self.automations.iter().map(|r| r.value().clone()).collect()
     }
 
     /// Get automation by ID
-    #[must_use] pub fn get(&self, id: &str) -> Option<Automation> {
+    #[must_use]
+    pub fn get(&self, id: &str) -> Option<Automation> {
         self.automations.get(id).map(|r| r.value().clone())
     }
 
     /// Create a new automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn create(
         &self,
         request: CreateAutomationRequest,
@@ -161,6 +166,7 @@ impl AutomationEngine {
     }
 
     /// Update an automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn update(
         &self,
         id: &str,
@@ -190,6 +196,7 @@ impl AutomationEngine {
     }
 
     /// Delete an automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn delete(&self, id: &str) -> Result<Automation, AutomationError> {
         let (_, automation) = self
             .automations
@@ -208,6 +215,7 @@ impl AutomationEngine {
     }
 
     /// Enable an automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn enable(&self, id: &str) -> Result<Automation, AutomationError> {
         self.update(
             id,
@@ -220,6 +228,7 @@ impl AutomationEngine {
     }
 
     /// Disable an automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn disable(&self, id: &str) -> Result<Automation, AutomationError> {
         self.update(
             id,
@@ -232,6 +241,7 @@ impl AutomationEngine {
     }
 
     /// Manually trigger an automation
+    #[allow(clippy::missing_errors_doc)]
     pub async fn trigger(&self, id: &str) -> Result<(), AutomationError> {
         let automation = self
             .automations
@@ -288,7 +298,7 @@ impl AutomationEngine {
         result
     }
 
-    /// Start listening for device events
+    #[allow(clippy::needless_pass_by_value)] // Arc is moved into spawned task
     fn start_device_listener(self: &Arc<Self>, network: Arc<ZigbeeNetwork>) {
         let engine = Arc::clone(self);
         let mut rx = network.subscribe();
@@ -319,7 +329,7 @@ impl AutomationEngine {
                 continue;
             }
 
-            if self.trigger_matches(&automation.trigger, &event) {
+            if Self::trigger_matches(&automation.trigger, &event) {
                 if let Err(e) = self.execute_automation(automation, "device_state").await {
                     tracing::error!("Failed to execute automation '{}': {}", automation.name, e);
                 }
@@ -327,8 +337,7 @@ impl AutomationEngine {
         }
     }
 
-    /// Check if a trigger matches a network event
-    fn trigger_matches(&self, trigger: &Trigger, event: &NetworkEvent) -> bool {
+    fn trigger_matches(trigger: &Trigger, event: &NetworkEvent) -> bool {
         match trigger {
             Trigger::DeviceState {
                 device_ieee,
@@ -336,17 +345,17 @@ impl AutomationEngine {
                 state_change,
             } => match event {
                 NetworkEvent::DeviceJoined(device) => {
-                    let ieee_str = format_ieee(&device.ieee_address);
+                    let ieee_str = format_ieee(device.ieee_address);
                     matches!(state_change, StateChange::Joined | StateChange::Any)
                         && ieee_str == *device_ieee
                 }
                 NetworkEvent::DeviceLeft { ieee_address } => {
-                    let ieee_str = format_ieee(ieee_address);
+                    let ieee_str = format_ieee(*ieee_address);
                     matches!(state_change, StateChange::Left | StateChange::Any)
                         && ieee_str == *device_ieee
                 }
                 NetworkEvent::DeviceUpdated { ieee_address } => {
-                    let ieee_str = format_ieee(ieee_address);
+                    let ieee_str = format_ieee(*ieee_address);
                     matches!(state_change, StateChange::Any) && ieee_str == *device_ieee
                 }
                 NetworkEvent::NetworkStateChanged { .. } => false,
@@ -355,7 +364,7 @@ impl AutomationEngine {
                     endpoint,
                     state_on,
                 } => {
-                    let ieee_str = format_ieee(ieee_address);
+                    let ieee_str = format_ieee(*ieee_address);
                     if ieee_str != *device_ieee {
                         return false;
                     }
@@ -414,8 +423,7 @@ impl AutomationEngine {
     }
 }
 
-/// Format IEEE address as string (e.g., "00:11:22:33:44:55:66:77")
-fn format_ieee(ieee: &[u8; 8]) -> String {
+fn format_ieee(ieee: [u8; 8]) -> String {
     ieee.iter()
         .rev()
         .map(|b| format!("{b:02x}"))

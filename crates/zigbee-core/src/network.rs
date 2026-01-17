@@ -71,12 +71,13 @@ pub struct ZigbeeNetwork {
 
 impl ZigbeeNetwork {
     /// Create a new network manager
+    #[allow(clippy::missing_errors_doc)]
     pub async fn new(serial_path: &str) -> Result<Self, NetworkError> {
         // Determine data directory from env or use default
         let data_dir = std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".to_string());
         let data_path = PathBuf::from(data_dir).join("devices.json");
 
-        let transport = Arc::new(DeconzTransport::connect(serial_path).await?);
+        let transport = Arc::new(DeconzTransport::connect(serial_path)?);
 
         let (event_tx, _) = broadcast::channel(64);
 
@@ -100,7 +101,8 @@ impl ZigbeeNetwork {
         Ok(network)
     }
 
-    /// Start background task to listen for deCONZ events
+    #[allow(clippy::needless_pass_by_value)] // Arc is moved into spawned task
+    #[allow(clippy::too_many_lines)] // Complex event handler for multiple event types
     fn start_event_listener(&self, transport: Arc<DeconzTransport>) {
         let devices = Arc::clone(&self.devices);
         let event_tx = self.event_tx.clone();
@@ -398,16 +400,19 @@ impl ZigbeeNetwork {
     }
 
     /// Get the underlying transport
-    #[must_use] pub fn transport(&self) -> &DeconzTransport {
+    #[must_use]
+    pub fn transport(&self) -> &DeconzTransport {
         &self.transport
     }
 
     /// Subscribe to network events
-    #[must_use] pub fn subscribe(&self) -> broadcast::Receiver<NetworkEvent> {
+    #[must_use]
+    pub fn subscribe(&self) -> broadcast::Receiver<NetworkEvent> {
         self.event_tx.subscribe()
     }
 
     /// Get network status
+    #[allow(clippy::missing_errors_doc)]
     pub async fn get_status(&self) -> Result<NetworkStatus, NetworkError> {
         let state = self.transport.get_device_state().await?;
 
@@ -436,14 +441,16 @@ impl ZigbeeNetwork {
             .transport
             .read_parameter(NetworkParameter::NwkExtendedPanId)
             .await
-            .map(|v| {
-                v.iter()
-                    .rev()
-                    .map(|b| format!("{b:02x}"))
-                    .collect::<Vec<_>>()
-                    .join(":")
-            })
-            .unwrap_or_else(|_| "unknown".to_string());
+            .map_or_else(
+                |_| "unknown".to_string(),
+                |v| {
+                    v.iter()
+                        .rev()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<Vec<_>>()
+                        .join(":")
+                },
+            );
 
         let permit_join = self
             .transport
@@ -463,6 +470,7 @@ impl ZigbeeNetwork {
     }
 
     /// Set permit join duration
+    #[allow(clippy::missing_errors_doc)]
     pub async fn permit_join(&self, duration_secs: u8) -> Result<(), NetworkError> {
         self.transport
             .write_parameter(NetworkParameter::PermitJoin, &[duration_secs])
@@ -485,12 +493,14 @@ impl ZigbeeNetwork {
     }
 
     /// Get all known devices
-    #[must_use] pub fn get_devices(&self) -> Vec<ZigbeeDevice> {
+    #[must_use]
+    pub fn get_devices(&self) -> Vec<ZigbeeDevice> {
         self.devices.iter().map(|r| r.value().clone()).collect()
     }
 
     /// Get a specific device by IEEE address
-    #[must_use] pub fn get_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
+    #[must_use]
+    pub fn get_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
         self.devices.get(ieee).map(|r| r.value().clone())
     }
 
@@ -512,7 +522,8 @@ impl ZigbeeNetwork {
     }
 
     /// Remove a device
-    #[must_use] pub fn remove_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
+    #[must_use]
+    pub fn remove_device(&self, ieee: &[u8; 8]) -> Option<ZigbeeDevice> {
         let removed = self.devices.remove(ieee).map(|(_, v)| v);
         if removed.is_some() {
             let _ = self.event_tx.send(NetworkEvent::DeviceLeft {
@@ -524,6 +535,7 @@ impl ZigbeeNetwork {
     }
 
     /// Send On/Off command to a device
+    #[allow(clippy::missing_errors_doc)]
     pub async fn send_on_off(
         &self,
         ieee: &[u8; 8],
@@ -584,22 +596,26 @@ impl ZigbeeNetwork {
     }
 
     /// Toggle a device
+    #[allow(clippy::missing_errors_doc)]
     pub async fn toggle_device(&self, ieee: &[u8; 8], endpoint: u8) -> Result<(), NetworkError> {
         self.send_on_off(ieee, endpoint, OnOffCommand::Toggle).await
     }
 
     /// Turn a device on
+    #[allow(clippy::missing_errors_doc)]
     pub async fn turn_on(&self, ieee: &[u8; 8], endpoint: u8) -> Result<(), NetworkError> {
         self.send_on_off(ieee, endpoint, OnOffCommand::On).await
     }
 
     /// Turn a device off
+    #[allow(clippy::missing_errors_doc)]
     pub async fn turn_off(&self, ieee: &[u8; 8], endpoint: u8) -> Result<(), NetworkError> {
         self.send_on_off(ieee, endpoint, OnOffCommand::Off).await
     }
 
     /// Request endpoint discovery for a device
     /// Sends Active Endpoints Request, response handled in event listener
+    #[allow(clippy::missing_errors_doc)]
     pub async fn discover_endpoints(&self, ieee: &[u8; 8]) -> Result<(), NetworkError> {
         let device = self
             .devices
@@ -621,6 +637,7 @@ impl ZigbeeNetwork {
     }
 
     /// Request simple descriptor for a specific endpoint
+    #[allow(clippy::missing_errors_doc)]
     pub async fn discover_simple_descriptor(
         &self,
         ieee: &[u8; 8],
@@ -647,6 +664,7 @@ impl ZigbeeNetwork {
     }
 
     /// Update device metadata (friendly name and category)
+    #[allow(clippy::missing_errors_doc)]
     pub fn update_device_metadata(
         &self,
         ieee: &[u8; 8],

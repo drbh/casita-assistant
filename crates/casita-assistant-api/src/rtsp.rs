@@ -95,6 +95,7 @@ impl RtspClient {
         Ok(rx)
     }
 
+    #[allow(clippy::too_many_lines)] // RTSP streaming requires handling multiple protocol stages
     async fn run_stream(
         url: Url,
         credentials: Option<Credentials>,
@@ -188,14 +189,18 @@ impl RtspClient {
                             sent_initial_params = true;
                             initial_params.take()
                         } else if frame.has_new_parameters() {
-                            if let Some(retina::codec::ParametersRef::Video(video_params)) =
-                                session.streams().get(video_stream_idx).and_then(retina::client::Stream::parameters)
+                            if let Some(retina::codec::ParametersRef::Video(video_params)) = session
+                                .streams()
+                                .get(video_stream_idx)
+                                .and_then(retina::client::Stream::parameters)
                             {
                                 let extra_data = video_params.extra_data();
                                 let (width, height) = video_params.pixel_dimensions();
                                 tracing::info!(
                                     "Got updated video parameters: {}x{}, extra_data len={}",
-                                    width, height, extra_data.len()
+                                    width,
+                                    height,
+                                    extra_data.len()
                                 );
                                 Some(H264Parameters {
                                     avcc: Bytes::copy_from_slice(extra_data),
@@ -241,6 +246,7 @@ pub struct Fmp4Writer {
     base_decode_time: u64,
 }
 
+#[allow(clippy::cast_possible_truncation)] // MP4 box sizes are u32 per spec
 impl Fmp4Writer {
     pub fn new() -> Self {
         Self {
@@ -249,7 +255,7 @@ impl Fmp4Writer {
         }
     }
 
-    pub fn write_init_segment(&self, width: u32, height: u32, avcc: &[u8]) -> Bytes {
+    pub fn write_init_segment(width: u32, height: u32, avcc: &[u8]) -> Bytes {
         let mut buf = BytesMut::with_capacity(512);
 
         // ftyp box
@@ -301,9 +307,9 @@ impl Fmp4Writer {
         buf.freeze()
     }
 
-    fn write_box_header(buf: &mut BytesMut, box_type: &[u8; 4], size: u32) {
+    fn write_box_header(buf: &mut BytesMut, box_type: [u8; 4], size: u32) {
         buf.put_u32(size);
-        buf.put_slice(box_type);
+        buf.put_slice(&box_type);
     }
 
     fn write_ftyp(buf: &mut BytesMut) {
@@ -343,7 +349,7 @@ impl Fmp4Writer {
         buf.put_u32(0); // modification time
         buf.put_u32(90000); // timescale (90kHz for video)
         buf.put_u32(0); // duration
-        buf.put_u32(0x00010000); // rate (1.0)
+        buf.put_u32(0x0001_0000); // rate (1.0)
         buf.put_u16(0x0100); // volume (1.0)
         buf.put_slice(&[0u8; 10]); // reserved
                                    // identity matrix
@@ -459,7 +465,7 @@ impl Fmp4Writer {
     }
 
     fn write_vmhd(buf: &mut BytesMut) {
-        Self::write_box_header(buf, b"vmhd", 20);
+        Self::write_box_header(buf, *b"vmhd", 20);
         buf.put_u8(0); // version
         buf.put_slice(&[0x00, 0x00, 0x01]); // flags
         buf.put_u16(0); // graphicsmode
@@ -480,7 +486,7 @@ impl Fmp4Writer {
         buf.put_u32(1); // entry_count
 
         // url (self-reference)
-        Self::write_box_header(buf, b"url ", 12);
+        Self::write_box_header(buf, *b"url ", 12);
         buf.put_u8(0);
         buf.put_slice(&[0x00, 0x00, 0x01]); // flags = self-contained
 
@@ -507,21 +513,21 @@ impl Fmp4Writer {
     }
 
     fn write_stts_empty(buf: &mut BytesMut) {
-        Self::write_box_header(buf, b"stts", 16);
+        Self::write_box_header(buf, *b"stts", 16);
         buf.put_u8(0); // version
         buf.put_slice(&[0u8; 3]); // flags
         buf.put_u32(0); // entry_count
     }
 
     fn write_stsc_empty(buf: &mut BytesMut) {
-        Self::write_box_header(buf, b"stsc", 16);
+        Self::write_box_header(buf, *b"stsc", 16);
         buf.put_u8(0); // version
         buf.put_slice(&[0u8; 3]); // flags
         buf.put_u32(0); // entry_count
     }
 
     fn write_stsz_empty(buf: &mut BytesMut) {
-        Self::write_box_header(buf, b"stsz", 20);
+        Self::write_box_header(buf, *b"stsz", 20);
         buf.put_u8(0); // version
         buf.put_slice(&[0u8; 3]); // flags
         buf.put_u32(0); // sample_size (0 = sizes are in table)
@@ -529,7 +535,7 @@ impl Fmp4Writer {
     }
 
     fn write_stco_empty(buf: &mut BytesMut) {
-        Self::write_box_header(buf, b"stco", 16);
+        Self::write_box_header(buf, *b"stco", 16);
         buf.put_u8(0); // version
         buf.put_slice(&[0u8; 3]); // flags
         buf.put_u32(0); // entry_count
@@ -558,8 +564,8 @@ impl Fmp4Writer {
         buf.put_slice(&[0u8; 16]); // pre_defined + reserved
         buf.put_u16(width as u16);
         buf.put_u16(height as u16);
-        buf.put_u32(0x00480000); // horizresolution (72 dpi)
-        buf.put_u32(0x00480000); // vertresolution (72 dpi)
+        buf.put_u32(0x0048_0000); // horizresolution (72 dpi)
+        buf.put_u32(0x0048_0000); // vertresolution (72 dpi)
         buf.put_u32(0); // reserved
         buf.put_u16(1); // frame_count
         buf.put_slice(&[0u8; 32]); // compressorname
@@ -590,7 +596,7 @@ impl Fmp4Writer {
         buf.put_slice(b"mvex");
 
         // trex
-        Self::write_box_header(buf, b"trex", 32);
+        Self::write_box_header(buf, *b"trex", 32);
         buf.put_u8(0); // version
         buf.put_slice(&[0u8; 3]); // flags
         buf.put_u32(1); // track_ID
@@ -616,7 +622,7 @@ impl Fmp4Writer {
         buf.put_slice(b"moof");
 
         // mfhd
-        Self::write_box_header(buf, b"mfhd", 16);
+        Self::write_box_header(buf, *b"mfhd", 16);
         buf.put_u8(0);
         buf.put_slice(&[0u8; 3]);
         buf.put_u32(sequence_number);
@@ -640,13 +646,13 @@ impl Fmp4Writer {
         buf.put_slice(b"traf");
 
         // tfhd
-        Self::write_box_header(buf, b"tfhd", 16);
+        Self::write_box_header(buf, *b"tfhd", 16);
         buf.put_u8(0);
         buf.put_slice(&[0x02, 0x00, 0x00]); // flags: default-base-is-moof
         buf.put_u32(1); // track_ID
 
         // tfdt (track fragment decode time)
-        Self::write_box_header(buf, b"tfdt", 20);
+        Self::write_box_header(buf, *b"tfdt", 20);
         buf.put_u8(1); // version 1 for 64-bit time
         buf.put_slice(&[0u8; 3]);
         buf.put_u64(base_decode_time);
@@ -673,9 +679,9 @@ impl Fmp4Writer {
 
         // first_sample_flags
         let flags = if is_keyframe {
-            0x02000000 // sample_depends_on = 2 (does not depend on others)
+            0x0200_0000 // sample_depends_on = 2 (does not depend on others)
         } else {
-            0x01010000 // sample_depends_on = 1 (depends on others), is_non_sync
+            0x0101_0000 // sample_depends_on = 1 (depends on others), is_non_sync
         };
         buf.put_u32(flags);
 
@@ -688,7 +694,7 @@ impl Fmp4Writer {
     }
 
     fn write_mdat(buf: &mut BytesMut, data: &[u8]) {
-        Self::write_box_header(buf, b"mdat", 8 + data.len() as u32);
+        Self::write_box_header(buf, *b"mdat", 8 + data.len() as u32);
         buf.put_slice(data);
     }
 }
@@ -715,7 +721,7 @@ mod tests {
             0x00, 0x04, // pps length = 4
             0x68, 0xeb, 0xe3, 0xcb, // pps data
         ];
-        let init = writer.write_init_segment(1920, 1080, &avcc);
+        let init = Fmp4Writer::write_init_segment(1920, 1080, &avcc);
 
         // Check ftyp box marker
         assert_eq!(&init[4..8], b"ftyp");

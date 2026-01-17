@@ -16,7 +16,7 @@ use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, Mutex};
 
 /// Default baud rate for `ConBee` II
-pub const BAUD_RATE: u32 = 115200;
+pub const BAUD_RATE: u32 = 115_200;
 
 /// Default request timeout
 pub const DEFAULT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -72,7 +72,8 @@ pub struct DeconzTransport {
 
 impl DeconzTransport {
     /// Connect to a deCONZ device at the given serial port path
-    pub async fn connect(path: &str) -> Result<Self, ProtocolError> {
+    #[allow(clippy::missing_errors_doc)]
+    pub fn connect(path: &str) -> Result<Self, ProtocolError> {
         tracing::info!("Connecting to deCONZ device at {}", path);
 
         // Open serial port
@@ -139,6 +140,7 @@ impl DeconzTransport {
     }
 
     /// Reader thread - runs in a standard thread with blocking I/O
+    #[allow(clippy::needless_pass_by_value)] // Values are moved into spawned thread
     fn reader_thread(port: SerialPort, frame_tx: mpsc::Sender<ReceivedFrame>) {
         tracing::debug!("Reader thread started");
         let mut buffer = [0u8; 1024];
@@ -165,15 +167,10 @@ impl DeconzTransport {
                         }
                     }
                 }
-                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {
-                    continue;
-                }
-                Err(ref e) if e.raw_os_error() == Some(libc::EAGAIN) => {
-                    continue;
-                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::TimedOut => {}
+                Err(ref e) if e.raw_os_error() == Some(libc::EAGAIN) => {}
                 Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                     std::thread::sleep(Duration::from_millis(10));
-                    continue;
                 }
                 Err(e) => {
                     tracing::error!("Serial read error: {}", e);
@@ -288,6 +285,7 @@ impl DeconzTransport {
     }
 
     /// Send a request and wait for response
+    #[allow(clippy::missing_errors_doc)]
     pub async fn request(
         &self,
         command_id: CommandId,
@@ -298,6 +296,7 @@ impl DeconzTransport {
     }
 
     /// Send a request with custom timeout
+    #[allow(clippy::missing_errors_doc)]
     pub async fn request_timeout(
         &self,
         command_id: CommandId,
@@ -349,6 +348,7 @@ impl DeconzTransport {
     }
 
     /// Query firmware version
+    #[allow(clippy::missing_errors_doc)]
     pub async fn get_version(&self) -> Result<FirmwareVersion, ProtocolError> {
         // Try to get version via ReadParameter(ProtocolVersion) as fallback
         // since the Version command may not work on all firmware versions
@@ -372,6 +372,7 @@ impl DeconzTransport {
     }
 
     /// Query device state
+    #[allow(clippy::missing_errors_doc)]
     pub async fn get_device_state(&self) -> Result<DeviceState, ProtocolError> {
         // DeviceState request with reserved byte (0x00) as per protocol spec
         let response = self.request(CommandId::DeviceState, vec![0x00]).await?;
@@ -389,6 +390,7 @@ impl DeconzTransport {
     }
 
     /// Read a network parameter
+    #[allow(clippy::missing_errors_doc)]
     pub async fn read_parameter(&self, param: NetworkParameter) -> Result<Vec<u8>, ProtocolError> {
         // Request format: payload_len(2 LE) + param_id(1)
         // payload_len = 1 (just the param_id byte)
@@ -423,6 +425,7 @@ impl DeconzTransport {
     }
 
     /// Request APS data indication (fetch waiting APS data)
+    #[allow(clippy::missing_errors_doc)]
     pub async fn request_aps_data(&self) -> Result<Vec<u8>, ProtocolError> {
         // APS_DATA_INDICATION request format: payload_len(2) + flags(1)
         // flags: 0x04 = request data
@@ -480,6 +483,7 @@ impl DeconzTransport {
     }
 
     /// Send APS data request (send command to a device)
+    #[allow(clippy::missing_errors_doc)]
     pub async fn send_aps_request(&self, request: ApsDataRequest) -> Result<(), ProtocolError> {
         let payload = request.serialize();
 
@@ -507,7 +511,8 @@ impl DeconzTransport {
         Ok(())
     }
 
-    /// Write a network parameter
+    #[allow(clippy::missing_panics_doc)] // Panic only on protocol-violating value size
+    #[allow(clippy::missing_errors_doc)]
     pub async fn write_parameter(
         &self,
         param: NetworkParameter,
@@ -516,7 +521,8 @@ impl DeconzTransport {
         // Request format per deCONZ Serial Protocol PDF:
         // payload_len(2 LE) + param_id(1) + value(N)
         // Where payload_len = 1 + len(value) (param_id + value bytes)
-        let payload_len = (1 + value.len()) as u16;
+        let payload_len =
+            u16::try_from(1 + value.len()).expect("parameter value exceeds protocol maximum");
 
         let mut payload = Vec::new();
         payload.extend_from_slice(&payload_len.to_le_bytes());

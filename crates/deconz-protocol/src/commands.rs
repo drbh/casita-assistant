@@ -33,7 +33,8 @@ pub enum CommandId {
 }
 
 impl CommandId {
-    #[must_use] pub fn from_u8(value: u8) -> Option<Self> {
+    #[must_use]
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x04 => Some(CommandId::ApsDataConfirm),
             0x07 => Some(CommandId::DeviceState),
@@ -94,7 +95,8 @@ pub enum NetworkParameter {
 }
 
 impl NetworkParameter {
-    #[must_use] pub fn from_u8(value: u8) -> Option<Self> {
+    #[must_use]
+    pub fn from_u8(value: u8) -> Option<Self> {
         match value {
             0x01 => Some(NetworkParameter::MacAddress),
             0x05 => Some(NetworkParameter::NwkPanId),
@@ -118,25 +120,24 @@ impl NetworkParameter {
     }
 
     /// Get the expected length of the parameter value
-    #[must_use] pub fn value_length(&self) -> usize {
+    #[must_use]
+    pub fn value_length(&self) -> usize {
         match self {
-            NetworkParameter::MacAddress => 8,
-            NetworkParameter::NwkPanId => 2,
-            NetworkParameter::NwkAddress => 2,
-            NetworkParameter::NwkExtendedPanId => 8,
-            NetworkParameter::ApsDesignedCoordinator => 1,
-            NetworkParameter::ChannelMask => 4,
-            NetworkParameter::ApsExtendedPanId => 8,
-            NetworkParameter::TrustCenterAddress => 8,
-            NetworkParameter::SecurityMode => 1,
-            NetworkParameter::PredefinedNwkPanId => 1,
-            NetworkParameter::NetworkKey => 16,
-            NetworkParameter::LinkKey => 16,
-            NetworkParameter::CurrentChannel => 1,
-            NetworkParameter::PermitJoin => 1,
-            NetworkParameter::ProtocolVersion => 2,
-            NetworkParameter::NwkUpdateId => 1,
-            NetworkParameter::WatchdogTtl => 4,
+            NetworkParameter::ApsDesignedCoordinator
+            | NetworkParameter::SecurityMode
+            | NetworkParameter::PredefinedNwkPanId
+            | NetworkParameter::CurrentChannel
+            | NetworkParameter::PermitJoin
+            | NetworkParameter::NwkUpdateId => 1,
+            NetworkParameter::NwkPanId
+            | NetworkParameter::NwkAddress
+            | NetworkParameter::ProtocolVersion => 2,
+            NetworkParameter::ChannelMask | NetworkParameter::WatchdogTtl => 4,
+            NetworkParameter::MacAddress
+            | NetworkParameter::NwkExtendedPanId
+            | NetworkParameter::ApsExtendedPanId
+            | NetworkParameter::TrustCenterAddress => 8,
+            NetworkParameter::NetworkKey | NetworkParameter::LinkKey => 16,
         }
     }
 }

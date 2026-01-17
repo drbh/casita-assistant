@@ -27,7 +27,8 @@ pub struct Frame {
 
 impl Frame {
     /// Create a new frame (for requests, status=0)
-    #[must_use] pub fn new(command_id: CommandId, sequence: u8, payload: Vec<u8>) -> Self {
+    #[must_use]
+    pub fn new(command_id: CommandId, sequence: u8, payload: Vec<u8>) -> Self {
         Self {
             command_id,
             sequence,
@@ -37,10 +38,13 @@ impl Frame {
     }
 
     /// Serialize frame to bytes (ready for SLIP encoding)
-    #[must_use] pub fn serialize(&self) -> Vec<u8> {
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)] // Panic only on protocol-violating payload size
+    pub fn serialize(&self) -> Vec<u8> {
         // frame_len = cmd(1) + seq(1) + status(1) + frame_len(2) + payload
         // Note: frame_len does NOT include the CRC bytes
-        let frame_len = (5 + self.payload.len()) as u16;
+        let frame_len =
+            u16::try_from(5 + self.payload.len()).expect("payload exceeds protocol maximum");
 
         let mut data = Vec::with_capacity(frame_len as usize + 2); // +2 for CRC
 
@@ -63,6 +67,7 @@ impl Frame {
     }
 
     /// Deserialize frame from bytes (after SLIP decoding)
+    #[allow(clippy::missing_errors_doc)]
     pub fn deserialize(data: &[u8]) -> Result<Self, ProtocolError> {
         if data.len() < MIN_FRAME_SIZE {
             return Err(ProtocolError::FrameTooShort(data.len()));
@@ -112,7 +117,8 @@ impl Frame {
     }
 
     /// Calculate 16-bit CRC (two's complement of sum)
-    #[must_use] pub fn calculate_crc(data: &[u8]) -> u16 {
+    #[must_use]
+    pub fn calculate_crc(data: &[u8]) -> u16 {
         let sum: u16 = data.iter().map(|&b| u16::from(b)).sum();
         (!sum).wrapping_add(1)
     }
