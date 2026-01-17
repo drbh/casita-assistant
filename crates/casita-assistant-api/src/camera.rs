@@ -1,10 +1,3 @@
-//! Camera management and streaming support
-//!
-//! Supports multiple stream types:
-//! - MJPEG: Direct HTTP proxy (most compatible)
-//! - RTSP/H.264: Native handling via retina crate, served as fMP4 for browser MSE
-//! - WebRTC: Planned for lowest latency (not yet implemented)
-
 use axum::{
     body::Body,
     extract::{Path, Query, State},
@@ -19,18 +12,14 @@ use std::{path::PathBuf, sync::Arc};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-use crate::rtsp::{build_rtsp_url, Fmp4Writer, RtspClient};
+use crate::rtsp::{Fmp4Writer, RtspClient};
 use crate::{ApiResponse, AppState};
 
-/// Camera stream type
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum StreamType {
-    /// MJPEG stream (HTTP proxy, most compatible)
     Mjpeg,
-    /// RTSP H.264 stream (native retina client, served as fMP4 for MSE)
     Rtsp,
-    /// WebRTC stream (planned, not yet implemented)
     WebRtc,
 }
 
@@ -41,7 +30,6 @@ pub struct StreamQuery {
     pub format: Option<String>,
 }
 
-/// Camera configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Camera {
     pub id: String,
@@ -49,24 +37,19 @@ pub struct Camera {
     pub stream_url: String,
     pub stream_type: StreamType,
     pub enabled: bool,
-    /// Optional RTSP username
     #[serde(skip_serializing_if = "Option::is_none")]
     pub username: Option<String>,
-    /// Optional RTSP password
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
 }
 
-/// Request to add a new camera
 #[derive(Debug, Deserialize)]
 pub struct AddCameraRequest {
     pub name: String,
     pub stream_url: String,
     #[serde(default = "default_stream_type")]
     pub stream_type: StreamType,
-    /// Optional RTSP username
     pub username: Option<String>,
-    /// Optional RTSP password
     pub password: Option<String>,
 }
 
@@ -74,7 +57,6 @@ fn default_stream_type() -> StreamType {
     StreamType::Mjpeg
 }
 
-/// Request to update a camera
 #[derive(Debug, Deserialize)]
 pub struct UpdateCameraRequest {
     pub name: Option<String>,
@@ -85,14 +67,12 @@ pub struct UpdateCameraRequest {
     pub enabled: Option<bool>,
 }
 
-/// Camera manager for storing and retrieving cameras
 pub struct CameraManager {
     cameras: Arc<DashMap<String, Camera>>,
     data_path: PathBuf,
 }
 
 impl CameraManager {
-    /// Create a new camera manager
     pub fn new(data_dir: &std::path::Path) -> Self {
         Self {
             cameras: Arc::new(DashMap::new()),
@@ -100,7 +80,6 @@ impl CameraManager {
         }
     }
 
-    /// Load cameras from disk
     pub fn load(&self) -> anyhow::Result<()> {
         if self.data_path.exists() {
             let content = std::fs::read_to_string(&self.data_path)?;
@@ -117,7 +96,6 @@ impl CameraManager {
         Ok(())
     }
 
-    /// Save cameras to disk
     pub fn save(&self) -> anyhow::Result<()> {
         let cameras: Vec<Camera> = self.cameras.iter().map(|r| r.value().clone()).collect();
         let content = serde_json::to_string_pretty(&cameras)?;
@@ -132,13 +110,11 @@ impl CameraManager {
         Ok(())
     }
 
-    /// Add a new camera
     pub fn add(&self, camera: Camera) -> anyhow::Result<()> {
         self.cameras.insert(camera.id.clone(), camera);
         self.save()
     }
 
-    /// Remove a camera by ID
     pub fn remove(&self, id: &str) -> Option<Camera> {
         let removed = self.cameras.remove(id).map(|(_, v)| v);
         if removed.is_some() {
@@ -147,12 +123,10 @@ impl CameraManager {
         removed
     }
 
-    /// Get a camera by ID
     pub fn get(&self, id: &str) -> Option<Camera> {
         self.cameras.get(id).map(|r| r.value().clone())
     }
 
-    /// Update a camera
     pub fn update(&self, id: &str, req: UpdateCameraRequest) -> Option<Camera> {
         let mut camera = self.cameras.get_mut(id)?;
         if let Some(name) = req.name {
@@ -179,7 +153,6 @@ impl CameraManager {
         Some(updated)
     }
 
-    /// List all cameras
     pub fn list(&self) -> Vec<Camera> {
         self.cameras.iter().map(|r| r.value().clone()).collect()
     }
@@ -189,13 +162,11 @@ impl CameraManager {
 // HTTP Handlers
 // =============================================================================
 
-/// List all cameras
 pub async fn list_cameras(State(state): State<AppState>) -> impl IntoResponse {
     let cameras = state.cameras.list();
     Json(ApiResponse::success(cameras))
 }
 
-/// Add a new camera
 pub async fn add_camera(
     State(state): State<AppState>,
     Json(req): Json<AddCameraRequest>,
@@ -219,7 +190,6 @@ pub async fn add_camera(
     }
 }
 
-/// Get a camera by ID
 pub async fn get_camera(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -233,7 +203,6 @@ pub async fn get_camera(
     }
 }
 
-/// Update a camera
 pub async fn update_camera(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -248,7 +217,6 @@ pub async fn update_camera(
     }
 }
 
-/// Delete a camera
 pub async fn delete_camera(
     State(state): State<AppState>,
     Path(id): Path<String>,
@@ -262,11 +230,6 @@ pub async fn delete_camera(
     }
 }
 
-/// Proxy stream from camera
-///
-/// For MJPEG cameras: Direct HTTP proxy
-/// For RTSP cameras: Native handling via retina, served as fMP4 for browser MSE
-///
 /// Query parameters:
 /// - format: "fmp4" (default for RTSP), "mjpeg"
 pub async fn stream_proxy(
@@ -301,7 +264,8 @@ pub async fn stream_proxy(
                     // Fallback to MJPEG via transcoding (not recommended)
                     (
                         StatusCode::NOT_IMPLEMENTED,
-                        "MJPEG transcoding from RTSP is no longer supported. Use fMP4 format.".to_string(),
+                        "MJPEG transcoding from RTSP is no longer supported. Use fMP4 format."
+                            .to_string(),
                     )
                         .into_response()
                 }
@@ -316,7 +280,6 @@ pub async fn stream_proxy(
     }
 }
 
-/// Stream MJPEG by proxying HTTP
 async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
     tracing::info!(
         "Proxying MJPEG stream from {} for camera {}",
@@ -324,7 +287,6 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
         camera.name
     );
 
-    // Create HTTP client and fetch the stream
     let client = reqwest::Client::new();
     let response = match client.get(&camera.stream_url).send().await {
         Ok(resp) => resp,
@@ -346,7 +308,6 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
             .into_response();
     }
 
-    // Get content-type from upstream (should be multipart/x-mixed-replace)
     let content_type = response
         .headers()
         .get(header::CONTENT_TYPE)
@@ -354,38 +315,22 @@ async fn stream_mjpeg(camera: &Camera) -> axum::response::Response {
         .unwrap_or("multipart/x-mixed-replace; boundary=frame")
         .to_string();
 
-    // Convert the response body stream to an axum Body
     let stream = response.bytes_stream().map(|result| {
         result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
     });
 
     let body = Body::from_stream(stream);
 
-    // Return streaming response
     (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response()
 }
 
-/// Stream RTSP via native retina client as fMP4 (fragmented MP4)
-///
-/// This is much more efficient than FFmpeg transcoding because:
-/// 1. No external process needed (pure Rust)
-/// 2. No transcoding - H.264 is passed through directly
-/// 3. Browser can decode H.264 natively via MSE (Media Source Extensions)
 async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
-    // Build RTSP URL with credentials
-    let rtsp_url = match build_rtsp_url(
-        &camera.stream_url,
-        camera.username.as_deref(),
-        camera.password.as_deref(),
-    ) {
+    // Parse RTSP URL (without credentials - retina doesn't support embedded credentials)
+    let rtsp_url = match url::Url::parse(&camera.stream_url) {
         Ok(url) => url,
         Err(e) => {
             tracing::error!("Invalid RTSP URL: {}", e);
-            return (
-                StatusCode::BAD_REQUEST,
-                format!("Invalid RTSP URL: {}", e),
-            )
-                .into_response();
+            return (StatusCode::BAD_REQUEST, format!("Invalid RTSP URL: {}", e)).into_response();
         }
     };
 
@@ -395,13 +340,13 @@ async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
     );
 
     let camera_name = camera.name.clone();
+    let username = camera.username.clone();
+    let password = camera.password.clone();
 
-    // Create the fMP4 stream
     let stream = async_stream::stream! {
-        // Connect to RTSP stream using retina
-        let client = RtspClient::new(rtsp_url);
+        let client = RtspClient::new(rtsp_url, username, password);
 
-        let (params, mut rx) = match client.connect().await {
+        let mut rx = match client.connect().await {
             Ok(result) => result,
             Err(e) => {
                 tracing::error!("Failed to connect to RTSP stream: {}", e);
@@ -411,29 +356,34 @@ async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
 
         tracing::info!("Connected to RTSP stream for camera {}", camera_name);
 
-        // Initialize fMP4 writer
         let mut writer = Fmp4Writer::new();
-
-        // Default SPS/PPS for H.264 baseline profile (will be updated from stream)
-        let default_sps = vec![0x67, 0x64, 0x00, 0x1f, 0xac, 0xd9, 0x40, 0x50, 0x05, 0xbb, 0x01, 0x10, 0x00, 0x00, 0x03, 0x00, 0x10, 0x00, 0x00, 0x03, 0x03, 0xc0, 0xf1, 0x83, 0x18, 0x46];
-        let default_pps = vec![0x68, 0xeb, 0xe3, 0xcb, 0x22, 0xc0];
-
-        // Send initialization segment
-        let init_segment = writer.write_init_segment(
-            params.width,
-            params.height,
-            if params.sps.is_empty() { &default_sps } else { &params.sps },
-            if params.pps.is_empty() { &default_pps } else { &params.pps },
-        );
-        yield Ok::<_, std::io::Error>(init_segment);
-
-        // Stream frames as fMP4 segments
+        let mut init_sent = false;
         let mut frame_count = 0u64;
         let frame_duration = 3000u32; // ~33ms at 90kHz for 30fps
 
         loop {
             match rx.recv().await {
                 Ok(frame) => {
+                    // Wait for parameters before sending init segment
+                    if !init_sent {
+                        if let Some(params) = &frame.new_parameters {
+                            let init_segment = writer.write_init_segment(
+                                params.width,
+                                params.height,
+                                &params.avcc,
+                            );
+                            tracing::info!(
+                                "Sending init segment for camera {} ({}x{}, avcc len={}, segment len={})",
+                                camera_name, params.width, params.height, params.avcc.len(), init_segment.len()
+                            );
+                            yield Ok::<_, std::io::Error>(init_segment);
+                            init_sent = true;
+                        } else {
+                            // Skip frames until we have parameters
+                            continue;
+                        }
+                    }
+
                     // Only start streaming from keyframe for clean playback
                     if frame_count == 0 && !frame.is_keyframe {
                         continue;
@@ -444,20 +394,24 @@ async fn stream_rtsp_fmp4(camera: &Camera) -> axum::response::Response {
                         frame.is_keyframe,
                         frame_duration,
                     );
-                    yield Ok(segment);
 
                     frame_count += 1;
 
-                    // Log periodically
-                    if frame_count % 300 == 0 {
-                        tracing::debug!("Streamed {} frames for camera {}", frame_count, camera_name);
+                    // Log first few segments and then periodically
+                    if frame_count <= 3 || frame_count % 300 == 0 {
+                        tracing::info!(
+                            "Sending segment {} for camera {} (keyframe={}, data_len={}, segment_len={})",
+                            frame_count, camera_name, frame.is_keyframe, frame.data.len(), segment.len()
+                        );
                     }
+
+                    yield Ok(segment);
                 }
                 Err(broadcast::error::RecvError::Lagged(n)) => {
                     tracing::warn!("Dropped {} frames due to slow consumer", n);
                 }
                 Err(broadcast::error::RecvError::Closed) => {
-                    tracing::info!("RTSP stream closed for camera {}", camera_name);
+                    tracing::info!("RTSP broadcast channel closed for camera {}", camera_name);
                     break;
                 }
             }

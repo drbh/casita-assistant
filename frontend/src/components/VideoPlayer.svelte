@@ -1,9 +1,6 @@
 <script lang="ts">
-  /**
-   * VideoPlayer component that supports multiple stream formats:
-   * - MJPEG: Uses <img> element (most compatible)
-   * - RTSP/fMP4: Uses <video> element with MSE (Media Source Extensions)
-   */
+  import { onMount, onDestroy } from 'svelte';
+  import { untrack } from 'svelte';
 
   interface Props {
     streamUrl: string;
@@ -14,23 +11,28 @@
   let { streamUrl, streamType, name }: Props = $props();
 
   let videoEl: HTMLVideoElement | null = $state(null);
-  let mediaSource: MediaSource | null = $state(null);
-  let sourceBuffer: SourceBuffer | null = $state(null);
   let error = $state<string | null>(null);
   let isLoading = $state(true);
 
-  // Buffer queue for MSE
+  // Non-reactive state for MSE (to avoid infinite loops)
+  let mediaSource: MediaSource | null = null;
+  let sourceBuffer: SourceBuffer | null = null;
   let bufferQueue: ArrayBuffer[] = [];
   let isAppending = false;
+  let initialized = false;
 
+  // Use $effect only to detect when videoEl becomes available
   $effect(() => {
-    if (streamType === 'rtsp' && videoEl) {
-      initMSE();
+    if (streamType === 'rtsp' && videoEl && !initialized) {
+      untrack(() => {
+        initialized = true;
+        initMSE();
+      });
     }
+  });
 
-    return () => {
-      cleanup();
-    };
+  onDestroy(() => {
+    cleanup();
   });
 
   function cleanup() {
@@ -45,6 +47,7 @@
     sourceBuffer = null;
     bufferQueue = [];
     isAppending = false;
+    initialized = false;
   }
 
   async function initMSE() {
@@ -53,7 +56,18 @@
       return;
     }
 
-    cleanup();
+    if (mediaSource && mediaSource.readyState === 'open') {
+      try {
+        mediaSource.endOfStream();
+      } catch (e) {
+        // Ignore
+      }
+    }
+    mediaSource = null;
+    sourceBuffer = null;
+    bufferQueue = [];
+    isAppending = false;
+
     isLoading = true;
     error = null;
 
@@ -61,20 +75,30 @@
 
     mediaSource.addEventListener('sourceopen', async () => {
       try {
-        // H.264 Baseline Profile for broad compatibility
-        const mimeType = 'video/mp4; codecs="avc1.42E01E"';
+        // Try High Profile first (most IP cameras use this)
+        // Format: avc1.PPCCLL where PP=profile, CC=constraints, LL=level
+        const codecsToTry = [
+          'video/mp4; codecs="avc1.640028"', // High Profile Level 4.0
+          'video/mp4; codecs="avc1.64001f"', // High Profile Level 3.1
+          'video/mp4; codecs="avc1.4d401f"', // Main Profile Level 3.1
+          'video/mp4; codecs="avc1.42E01E"', // Baseline Profile Level 3.0
+        ];
 
-        if (!MediaSource.isTypeSupported(mimeType)) {
-          // Try High Profile
-          const highProfile = 'video/mp4; codecs="avc1.640028"';
-          if (!MediaSource.isTypeSupported(highProfile)) {
-            error = 'H.264 codec not supported';
-            return;
+        let supportedCodec: string | null = null;
+        for (const codec of codecsToTry) {
+          if (MediaSource.isTypeSupported(codec)) {
+            supportedCodec = codec;
+            break;
           }
-          sourceBuffer = mediaSource!.addSourceBuffer(highProfile);
-        } else {
-          sourceBuffer = mediaSource!.addSourceBuffer(mimeType);
         }
+
+        if (!supportedCodec) {
+          error = 'H.264 codec not supported';
+          return;
+        }
+
+        console.log('Using codec:', supportedCodec);
+        sourceBuffer = mediaSource!.addSourceBuffer(supportedCodec);
 
         sourceBuffer.mode = 'segments';
 
@@ -88,7 +112,6 @@
           error = 'Stream decode error';
         });
 
-        // Start fetching the stream
         await fetchStream();
 
       } catch (e) {
@@ -112,6 +135,7 @@
 
   async function fetchStream() {
     try {
+      console.log('Fetching stream:', streamUrl);
       const response = await fetch(streamUrl);
 
       if (!response.ok) {
@@ -128,8 +152,8 @@
       }
 
       isLoading = false;
+      console.log('Stream connected, reading data...');
 
-      // Read the stream
       while (true) {
         const { done, value } = await reader.read();
 
@@ -138,8 +162,7 @@
           break;
         }
 
-        if (value && sourceBuffer) {
-          // Queue the buffer
+        if (value && sourceBuffer && mediaSource?.readyState === 'open') {
           bufferQueue.push(value.buffer);
           appendNextBuffer();
         }
@@ -161,6 +184,12 @@
       return;
     }
 
+    if (mediaSource?.readyState !== 'open') {
+      console.warn('MediaSource not open, skipping append');
+      bufferQueue = []; // Clear queue since we can't append
+      return;
+    }
+
     // Remove old data to prevent buffer overflow
     try {
       if (videoEl && sourceBuffer.buffered.length > 0) {
@@ -170,11 +199,11 @@
         // Keep only 30 seconds of buffer behind current time
         if (currentTime - bufferStart > 30) {
           sourceBuffer.remove(bufferStart, currentTime - 10);
-          return; // Wait for remove to complete
+          return;
         }
       }
     } catch (e) {
-      // Ignore buffer management errors
+      // ignore
     }
 
     isAppending = true;
@@ -182,11 +211,10 @@
 
     try {
       sourceBuffer.appendBuffer(buffer);
-    } catch (e) {
-      console.error('Append error:', e);
+    } catch (e: any) {
+      console.error('Append error:', e?.name, e?.message);
       isAppending = false;
 
-      // If quota exceeded, try removing old data
       if (e instanceof DOMException && e.name === 'QuotaExceededError') {
         if (sourceBuffer.buffered.length > 0) {
           const start = sourceBuffer.buffered.start(0);
@@ -199,6 +227,8 @@
             }
           }
         }
+      } else {
+        bufferQueue = [];
       }
     }
   }
