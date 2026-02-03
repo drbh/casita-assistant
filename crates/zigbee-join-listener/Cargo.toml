@@ -1,0 +1,17 @@
+[package]
+name = "zigbee-join-listener"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Simple CLI tool to listen for Zigbee devices joining the network"
+
+[[bin]]
+name = "zigbee-join-listener"
+path = "src/main.rs"
+
+[dependencies]
+deconz-protocol = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

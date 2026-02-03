@@ -5,6 +5,7 @@ members = [
     "crates/zigbee-core",
     "crates/automation-engine",
     "crates/casita-assistant-api",
+    "crates/zigbee-join-listener",
 ]
 
 [workspace.package]
