@@ -83,6 +83,10 @@ impl DeconzTransport {
         port.set_read_timeout(Duration::from_millis(100))
             .map_err(ProtocolError::SerialError)?;
 
+        // Set write timeout to prevent blocking forever if device is unresponsive
+        port.set_write_timeout(Duration::from_millis(1000))
+            .map_err(ProtocolError::SerialError)?;
+
         // Clone port for reader (serial2 supports clone)
         let reader_port = port.try_clone().map_err(ProtocolError::SerialError)?;
 
@@ -272,7 +276,7 @@ impl DeconzTransport {
                 // Parse MAC poll - contains source address info
                 if frame.payload.len() >= 3 {
                     let short_addr = u16::from_le_bytes([frame.payload[1], frame.payload[2]]);
-                    tracing::debug!("MacPoll from device: {:#06x}", short_addr);
+                    // tracing::debug!("MacPoll from device: {:#06x}", short_addr);
                     let _ = event_tx.send(DeconzEvent::MacPoll { short_addr });
                 }
             }

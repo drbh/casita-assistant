@@ -115,21 +115,16 @@ impl ZigbeeNetwork {
                 match deconz_rx.recv().await {
                     Ok(DeconzEvent::ApsDataAvailable) => {
                         // Automatically fetch APS data when available
+                        // Note: DeviceStateChanged with aps_data_indication also emits this event,
+                        // so we only handle it here to avoid duplicate requests
                         tracing::debug!("APS data available, fetching...");
                         if let Err(e) = transport_clone.request_aps_data().await {
                             tracing::warn!("Failed to fetch APS data: {}", e);
                         }
                     }
-                    Ok(DeconzEvent::DeviceStateChanged(state)) => {
-                        // If aps_data_indication is set, fetch the data
-                        if state.aps_data_indication {
-                            tracing::debug!(
-                                "Device state indicates APS data available, fetching..."
-                            );
-                            if let Err(e) = transport_clone.request_aps_data().await {
-                                tracing::warn!("Failed to fetch APS data: {}", e);
-                            }
-                        }
+                    Ok(DeconzEvent::DeviceStateChanged(_state)) => {
+                        // APS data indication is handled via ApsDataAvailable event
+                        // to avoid duplicate requests
                     }
                     Ok(DeconzEvent::DeviceAnnounced {
                         ieee_addr,
@@ -235,13 +230,35 @@ impl ZigbeeNetwork {
                                         }
                                     };
 
-                                    // Find the source device by short address
+                                    // Find the source device - prefer IEEE address if available
                                     let mut found_device = None;
-                                    for entry in devices.iter() {
-                                        if entry.nwk_address == indication.src_short_addr {
-                                            found_device =
-                                                Some((entry.ieee_address, indication.src_endpoint));
-                                            break;
+                                    if let Some(ieee) = indication.src_ieee_addr {
+                                        // Direct IEEE lookup
+                                        if devices.contains_key(&ieee) {
+                                            // Update nwk_address if it changed
+                                            if let Some(mut entry) = devices.get_mut(&ieee) {
+                                                if entry.nwk_address != indication.src_short_addr {
+                                                    tracing::info!(
+                                                        "Updating device nwk_address from {:#06x} to {:#06x}",
+                                                        entry.nwk_address,
+                                                        indication.src_short_addr
+                                                    );
+                                                    entry.nwk_address = indication.src_short_addr;
+                                                }
+                                            }
+                                            found_device = Some((ieee, indication.src_endpoint));
+                                        }
+                                    }
+                                    // Fall back to short address lookup
+                                    if found_device.is_none() {
+                                        for entry in devices.iter() {
+                                            if entry.nwk_address == indication.src_short_addr {
+                                                found_device = Some((
+                                                    entry.ieee_address,
+                                                    indication.src_endpoint,
+                                                ));
+                                                break;
+                                            }
                                         }
                                     }
 
@@ -259,11 +276,10 @@ impl ZigbeeNetwork {
                                         tracing::info!(
                                             "Device {:#04x} sent On/Off command: {} (state={})",
                                             indication.src_short_addr,
-                                            match cmd_id {
-                                                0x00 => "Off",
-                                                0x01 => "On",
-                                                0x02 => "Toggle",
-                                                _ => "?",
+                                            match state_on {
+                                                Some(false) => "Off",
+                                                Some(true) => "On",
+                                                None => "Toggle",
                                             },
                                             resolved_state
                                         );
@@ -278,6 +294,101 @@ impl ZigbeeNetwork {
                                         tracing::debug!(
                                             "On/Off command from unknown device {:#06x}",
                                             indication.src_short_addr
+                                        );
+                                    }
+                                }
+                                // Handle IAS Zone cluster (buttons, sensors)
+                                else if indication.cluster_id == clusters::IAS_ZONE
+                                    && zcl.is_cluster_specific()
+                                {
+                                    let cmd_id = zcl.command_id();
+                                    // 0x00 = Zone Status Change Notification
+                                    if cmd_id == 0x00 && zcl.payload().len() >= 2 {
+                                        let zone_status = u16::from_le_bytes([
+                                            zcl.payload()[0],
+                                            zcl.payload()[1],
+                                        ]);
+                                        // Bit 0 = Alarm1, Bit 1 = Alarm2
+                                        let alarm1 = (zone_status & 0x01) != 0;
+                                        let alarm2 = (zone_status & 0x02) != 0;
+
+                                        tracing::info!(
+                                            "IAS Zone status from {:#06x}: status={:#06x} alarm1={} alarm2={}",
+                                            indication.src_short_addr,
+                                            zone_status,
+                                            alarm1,
+                                            alarm2
+                                        );
+
+                                        // Find the source device - prefer IEEE address if available
+                                        let mut found_device = None;
+                                        if let Some(ieee) = indication.src_ieee_addr {
+                                            // Direct IEEE lookup
+                                            if devices.contains_key(&ieee) {
+                                                // Update nwk_address if it changed
+                                                if let Some(mut entry) = devices.get_mut(&ieee) {
+                                                    if entry.nwk_address
+                                                        != indication.src_short_addr
+                                                    {
+                                                        tracing::info!(
+                                                            "Updating device nwk_address from {:#06x} to {:#06x}",
+                                                            entry.nwk_address,
+                                                            indication.src_short_addr
+                                                        );
+                                                        entry.nwk_address =
+                                                            indication.src_short_addr;
+                                                    }
+                                                }
+                                                found_device =
+                                                    Some((ieee, indication.src_endpoint));
+                                            }
+                                        }
+                                        // Fall back to short address lookup
+                                        if found_device.is_none() {
+                                            for entry in devices.iter() {
+                                                if entry.nwk_address == indication.src_short_addr {
+                                                    found_device = Some((
+                                                        entry.ieee_address,
+                                                        indication.src_endpoint,
+                                                    ));
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if let Some((ieee_address, endpoint)) = found_device {
+                                            // Only emit event when button is pressed (alarm active)
+                                            // Release events (alarm=false) are typically not useful for automations
+                                            if alarm1 || alarm2 {
+                                                tracing::info!(
+                                                    "IAS Zone button pressed: device={:02x?} endpoint={}",
+                                                    ieee_address,
+                                                    endpoint
+                                                );
+                                                let _ = event_tx.send(
+                                                    NetworkEvent::DeviceStateChanged {
+                                                        ieee_address,
+                                                        endpoint,
+                                                        state_on: true,
+                                                    },
+                                                );
+                                            } else {
+                                                tracing::debug!(
+                                                    "IAS Zone button released: device={:02x?} endpoint={}",
+                                                    ieee_address,
+                                                    endpoint
+                                                );
+                                            }
+                                        } else {
+                                            tracing::debug!(
+                                                "IAS Zone from unknown device {:#06x}",
+                                                indication.src_short_addr
+                                            );
+                                        }
+                                    } else {
+                                        tracing::debug!(
+                                            "Unknown IAS Zone command: {:#04x}",
+                                            cmd_id
                                         );
                                     }
                                 }

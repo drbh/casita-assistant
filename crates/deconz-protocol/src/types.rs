@@ -552,6 +552,7 @@ pub mod clusters {
     pub const ON_OFF: u16 = 0x0006;
     pub const LEVEL_CONTROL: u16 = 0x0008;
     pub const COLOR_CONTROL: u16 = 0x0300;
+    pub const IAS_ZONE: u16 = 0x0500;
 }
 
 /// ZCL profile IDs
